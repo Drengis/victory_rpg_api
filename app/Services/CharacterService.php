@@ -3,7 +3,11 @@
 namespace App\Services;
 
 use App\Models\Character;
+use App\Models\CharacterStat;
+use App\Models\CharacterDynamicStat;
 use App\Services\Core\BaseService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CharacterService extends BaseService
 {
@@ -124,5 +128,118 @@ class CharacterService extends BaseService
             'damage' => $mainStatValue * 1.0, // +1% к урону
             'accuracy' => $mainStatValue * 0.5, // +0.5% к попаданию
         ];
+    }
+
+    /**
+     * Синхронизировать вычисляемые характеристики персонажа
+     */
+    public function syncStats(Character $character): void
+    {
+        $calculated = $this->calculateFinalStats($character);
+        $derived = $calculated['derived_stats'];
+
+        CharacterStat::updateOrCreate(
+            ['character_id' => $character->id],
+            [
+                'max_hp' => $derived['hp'],
+                'hp_regen' => $derived['hp_regen'],
+                'max_mp' => $derived['mana'],
+                'mp_regen' => $derived['mana_regen'],
+                'physical_damage_bonus' => $derived['physical_damage_bonus'],
+                'magical_damage_bonus' => $derived['magical_damage_bonus'],
+                'accuracy' => $derived['accuracy'],
+                'evasion' => $derived['evasion'],
+                'crit_chance' => $derived['crit_chance'],
+                'rare_loot_bonus' => $derived['rare_loot_bonus'],
+            ]
+        );
+
+        // Инициализация динамических статов, если их нет
+        if (!$character->dynamicStats()->exists()) {
+            $character->dynamicStats()->create([
+                'current_hp' => $derived['hp'],
+                'current_mp' => $derived['mana'],
+                'last_regen_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Обновить динамические показатели (регенерация)
+     */
+    public function refreshDynamicStats(Character $character): CharacterDynamicStat
+    {
+        return DB::transaction(function () use ($character) {
+            $dynamic = $character->dynamicStats;
+            $stats = $character->stats;
+
+            if (!$dynamic || !$stats) {
+                $this->syncStats($character);
+                $character->load(['stats', 'dynamicStats']);
+                $dynamic = $character->dynamicStats;
+                $stats = $character->stats;
+            }
+
+            $now = Carbon::now();
+            $secondsPassed = $now->diffInSeconds($dynamic->last_regen_at);
+            $secondsPassed = abs($secondsPassed);
+
+            // Если персонаж в бою, временная регенерация не начисляется
+            if ($dynamic->is_in_combat) {
+                return $dynamic;
+            }
+
+            if ($secondsPassed > 0) {
+                // Регенерация HP
+                if ($dynamic->current_hp < $stats->max_hp) {
+                    $regenHp = ($stats->hp_regen / 60) * $secondsPassed;
+                    $dynamic->current_hp = min($stats->max_hp, $dynamic->current_hp + $regenHp);
+                }
+
+                // Регенерация MP
+                if ($dynamic->current_mp < $stats->max_mp) {
+                    $regenMp = ($stats->mp_regen / 60) * $secondsPassed;
+                    $dynamic->current_mp = min($stats->max_mp, $dynamic->current_mp + $regenMp);
+                }
+
+                $dynamic->last_regen_at = $now;
+                $dynamic->save();
+            }
+
+            return $dynamic;
+        });
+    }
+
+    /**
+     * Начислить регенерацию за один раунд боя
+     */
+    public function applyCombatRoundRegen(Character $character): CharacterDynamicStat
+    {
+        return DB::transaction(function () use ($character) {
+            $dynamic = $character->dynamicStats;
+            $stats = $character->stats;
+
+            if (!$dynamic || !$stats) {
+                return $this->refreshDynamicStats($character);
+            }
+
+            // 1 раунд условно = 6 секунд (1/10 минуты)
+            $roundFactor = 6 / 60;
+
+            if ($dynamic->current_hp < $stats->max_hp) {
+                $regenHp = $stats->hp_regen * $roundFactor;
+                $dynamic->current_hp = min($stats->max_hp, $dynamic->current_hp + $regenHp);
+            }
+
+            if ($dynamic->current_mp < $stats->max_mp) {
+                $regenMp = $stats->mp_regen * $roundFactor;
+                $dynamic->current_mp = min($stats->max_mp, $dynamic->current_mp + $regenMp);
+            }
+
+            $dynamic->last_regen_at = Carbon::now();
+            $dynamic->save();
+
+            return $dynamic;
+        });
     }
 }
