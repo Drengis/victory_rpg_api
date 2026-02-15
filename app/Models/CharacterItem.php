@@ -13,11 +13,13 @@ class CharacterItem extends Model
         'ilevel',
         'slot',
         'is_equipped',
+        'quantity',
     ];
 
     protected $casts = [
         'is_equipped' => 'boolean',
         'ilevel' => 'integer',
+        'quantity' => 'integer',
     ];
 
     public function character(): BelongsTo

@@ -8,11 +8,13 @@ use App\Models\CharacterDynamicStat;
 use App\Models\CharacterItem;
 use App\Models\Item;
 use App\Services\Core\BaseService;
+use App\Traits\CalculatesDerivedStats;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CharacterService extends BaseService
 {
+    use CalculatesDerivedStats;
     protected function getModel(): string
     {
         return Character::class;
@@ -101,20 +103,13 @@ class CharacterService extends BaseService
         }
 
         // 3. Расчет боевых параметров на основе итоговых стат
-        $stats = [
-            'max_hp' => $modifiedStats['constitution'] * 10,
-            'hp_regen' => $modifiedStats['constitution'] * 0.5,
-            'max_mp' => $modifiedStats['intelligence'] * 15,
-            'mp_regen' => $modifiedStats['intelligence'] * 0.2,
-            'accuracy' => $modifiedStats['agility'] * 2,
-            'evasion' => $modifiedStats['agility'] * 1,
-            'crit_chance' => $modifiedStats['luck'] * 0.3,
-            'rare_loot_bonus' => $modifiedStats['luck'] * 0.5,
-            'physical_damage_bonus' => 0,
-            'magical_damage_bonus' => 0,
-            'min_damage' => 1,
-            'max_damage' => 2,
-        ];
+        $stats = $this->getDerivedStats($modifiedStats);
+        
+        // Значения по умолчанию для урона (если нет оружия)
+        $stats['min_damage'] = 1;
+        $stats['max_damage'] = 2;
+        $stats['physical_damage_bonus'] = 0;
+        $stats['magical_damage_bonus'] = 0;
 
         // Классовые бонусы к урону и точности
         $class = mb_strtolower($character->class);
@@ -414,6 +409,11 @@ class CharacterService extends BaseService
      */
     public function equipItem(Character $character, CharacterItem $charItem, string $slot): void
     {
+        $item = $charItem->item;
+        if ($item->required_class && mb_strtolower($item->required_class) !== mb_strtolower($character->class)) {
+            throw new \Exception("Этот предмет предназначен для класса: {$item->required_class}.");
+        }
+
         DB::transaction(function () use ($character, $charItem, $slot) {
             // Сначала снимаем всё, что в этом слоте
             $character->items()

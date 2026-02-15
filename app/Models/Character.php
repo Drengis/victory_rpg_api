@@ -15,6 +15,7 @@ class Character extends Model
         'class',
         'level',
         'experience',
+        'gold',
         'stat_points',
         'strength',
         'agility',
@@ -31,6 +32,7 @@ class Character extends Model
     protected $attributes = [
         'level' => 1,
         'experience' => 0,
+        'gold' => 0,
         'stat_points' => 0,
         'strength_added' => 0,
         'agility_added' => 0,
@@ -42,6 +44,7 @@ class Character extends Model
     protected $casts = [
         'level' => 'integer',
         'experience' => 'integer',
+        'gold' => 'integer',
         'stat_points' => 'integer',
     ];
 
