@@ -17,6 +17,38 @@ class CharacterService extends BaseService
     }
 
     /**
+     * Создать нового персонажа
+     */
+    public function createCharacter(array $data): Character
+    {
+        $validClasses = ['воин', 'лучник', 'маг'];
+        $class = mb_strtolower($data['class'] ?? '');
+        
+        if (!in_array($class, $validClasses)) {
+            throw new \Exception("Невалидный класс персонажа.");
+        }
+
+        return DB::transaction(function () use ($data) {
+            $character = Character::create([
+                'user_id' => $data['user_id'],
+                'name' => $data['name'],
+                'class' => $data['class'],
+                // Базовые статы будут 5 по умолчанию из БД, 
+                // но укажем явно для чистоты
+                'strength' => 5,
+                'agility' => 5,
+                'constitution' => 5,
+                'intelligence' => 5,
+                'luck' => 5,
+            ]);
+
+            $this->syncStats($character);
+            
+            return $character;
+        });
+    }
+
+    /**
      * Расчитать финальные характеристики персонажа
      * @param Character $character
      * @return array
@@ -35,8 +67,9 @@ class CharacterService extends BaseService
         
         $modifiedStats = [];
         foreach ($baseStats as $stat => $value) {
+            $added = $character->{$stat . '_added'} ?? 0;
             $mod = $modifiers[$stat] ?? 0;
-            $modifiedStats[$stat] = round($value * (1 + $mod / 100));
+            $modifiedStats[$stat] = round(($value + $added) * (1 + $mod / 100));
         }
 
         return [
@@ -241,5 +274,68 @@ class CharacterService extends BaseService
 
             return $dynamic;
         });
+    }
+
+    /**
+     * Рассчитать опыт для следующего уровня.
+     * Формула: XPn=100+30*(n-1)+10*(n-1)^2
+     */
+    public function calculateXpForLevel(int $level): int
+    {
+        if ($level < 1) return 100;
+        $n_minus_1 = $level - 1;
+        return 100 + (30 * $n_minus_1) + (10 * ($n_minus_1 ** 2));
+    }
+
+    /**
+     * Добавить опыт персонажу
+     */
+    public function addExperience(Character $character, int $amount): void
+    {
+        $character->experience += $amount;
+
+        $xpNeeded = $this->calculateXpForLevel($character->level);
+
+        while ($character->experience >= $xpNeeded) {
+            $character->experience -= $xpNeeded;
+            $character->level++;
+            $character->stat_points += 3;
+            $xpNeeded = $this->calculateXpForLevel($character->level);
+        }
+
+        $character->save();
+        $this->syncStats($character);
+    }
+
+    /**
+     * Распределить очки характеристик
+     * @param string $stat (strength, agility, constitution, intelligence, luck)
+     */
+    public function distributeStatPoint(Character $character, string $stat): void
+    {
+        if ($character->stat_points <= 0) {
+            throw new \Exception("Недостаточно очков характеристик.");
+        }
+
+        $validStats = ['strength', 'agility', 'constitution', 'intelligence', 'luck'];
+        if (!in_array($stat, $validStats)) {
+            throw new \Exception("Невалидная характеристика.");
+        }
+
+        // Валидация: Максимум 2 очка в одну характеристику за уровень.
+        // Это значит, что для уровня L, сумма вложенных очков в одну стату не может превышать (L-1) * 2.
+        $addedField = $stat . '_added';
+        $currentAdded = $character->{$addedField};
+        $limit = ($character->level - 1) * 2;
+
+        if ($currentAdded >= $limit) {
+            throw new \Exception("Достигнут предел прокачки этой характеристики для текущего уровня.");
+        }
+
+        $character->{$addedField}++;
+        $character->stat_points--;
+        $character->save();
+
+        $this->syncStats($character);
     }
 }

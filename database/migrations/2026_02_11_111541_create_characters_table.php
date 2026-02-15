@@ -18,11 +18,11 @@ return new class extends Migration
             $table->string('class'); // воин, лучник, маг
             
             // Базовые характеристики
-            $table->integer('strength')->default(10);
-            $table->integer('agility')->default(10);
-            $table->integer('constitution')->default(10);
-            $table->integer('intelligence')->default(10);
-            $table->integer('luck')->default(10);
+            $table->integer('strength')->default(5);
+            $table->integer('agility')->default(5);
+            $table->integer('constitution')->default(5);
+            $table->integer('intelligence')->default(5);
+            $table->integer('luck')->default(5);
             
             $table->timestamps();
         });
