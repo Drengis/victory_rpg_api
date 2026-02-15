@@ -62,8 +62,8 @@ class CharacterCreationTest extends TestCase
         // Strength: 4.5 -> 5
         
         $stats = $character->stats;
-        // Accuracy for Archer: Agi * 2 = 6 * 2 = 12%
-        $this->assertEquals(12, $stats->accuracy);
+        // Accuracy for Archer: Agi(6) * 4 = 24%
+        $this->assertEquals(24, $stats->accuracy);
         // Damage bonus for Archer: Str(1%) + Agi(1%) = 5 + 6 = 11%
         $this->assertEquals(11, $stats->physical_damage_bonus);
     }

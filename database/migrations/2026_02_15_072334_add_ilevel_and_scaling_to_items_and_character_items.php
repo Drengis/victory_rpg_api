@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('items', function (Blueprint $table) {
+            $table->float('scaling_factor')->default(0.1)->after('quality');
+        });
+
+        Schema::table('character_items', function (Blueprint $table) {
+            $table->integer('ilevel')->default(1)->after('item_id');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('items', function (Blueprint $table) {
+            $table->dropColumn('scaling_factor');
+        });
+
+        Schema::table('character_items', function (Blueprint $table) {
+            $table->dropColumn('ilevel');
+        });
+    }
+};

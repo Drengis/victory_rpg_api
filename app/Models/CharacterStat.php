@@ -19,6 +19,8 @@ class CharacterStat extends Model
         'evasion',
         'crit_chance',
         'rare_loot_bonus',
+        'min_damage',
+        'max_damage',
     ];
 
     public function character(): BelongsTo

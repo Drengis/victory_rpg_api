@@ -25,6 +25,9 @@ return new class extends Migration
             $table->float('crit_chance')->default(0);
             $table->float('rare_loot_bonus')->default(0);
             
+            $table->integer('min_damage')->default(1);
+            $table->integer('max_damage')->default(2);
+            
             $table->timestamps();
         });
     }

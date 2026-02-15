@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Character extends Model
 {
@@ -51,5 +53,15 @@ class Character extends Model
     public function dynamicStats(): HasOne
     {
         return $this->hasOne(CharacterDynamicStat::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(CharacterItem::class);
+    }
+
+    public function equippedItems(): HasMany
+    {
+        return $this->hasMany(CharacterItem::class)->where('is_equipped', true);
     }
 }

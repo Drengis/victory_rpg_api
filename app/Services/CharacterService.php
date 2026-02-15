@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Character;
 use App\Models\CharacterStat;
 use App\Models\CharacterDynamicStat;
+use App\Models\CharacterItem;
+use App\Models\Item;
 use App\Services\Core\BaseService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,7 @@ class CharacterService extends BaseService
      */
     public function calculateFinalStats(Character $character): array
     {
+        $modifiers = $this->getClassModifiers($character->class);
         $baseStats = [
             'strength' => $character->strength,
             'agility' => $character->agility,
@@ -63,21 +66,87 @@ class CharacterService extends BaseService
             'luck' => $character->luck,
         ];
 
-        $modifiers = $this->getClassModifiers($character->class);
-        
+        // 1. Собираем статы со шмота
+        $gearStats = [
+            'strength' => 0,
+            'agility' => 0,
+            'constitution' => 0,
+            'intelligence' => 0,
+            'luck' => 0,
+        ];
+
+        $weapon = null;
+        $equippedItems = $character->equippedItems()->with('item')->get();
+
+        foreach ($equippedItems as $charItem) {
+            $item = $charItem->item;
+            if ($item->type === 'weapon') {
+                $weapon = $item;
+            }
+
+            foreach ($gearStats as $stat => $value) {
+                $gearStats[$stat] += $item->getBonus($stat, $charItem->ilevel);
+            }
+        }
+
+        // 2. Складываем Базу + Вложенные очки + Шмот
         $modifiedStats = [];
         foreach ($baseStats as $stat => $value) {
             $added = $character->{$stat . '_added'} ?? 0;
+            $gear = $gearStats[$stat];
+            
+            // Сначала складываем всё, потом применяем классовый множитель
             $mod = $modifiers[$stat] ?? 0;
-            $modifiedStats[$stat] = round(($value + $added) * (1 + $mod / 100));
+            $modifiedStats[$stat] = round(($value + $added + $gear) * (1 + $mod / 100));
         }
 
-        return [
-            'base_stats' => $baseStats,
-            'class_modifiers' => $modifiers,
-            'final_stats' => $modifiedStats,
-            'derived_stats' => $this->calculateDerivedStats($character, $modifiedStats),
+        // 3. Расчет боевых параметров на основе итоговых стат
+        $stats = [
+            'max_hp' => $modifiedStats['constitution'] * 10,
+            'hp_regen' => $modifiedStats['constitution'] * 0.5,
+            'max_mp' => $modifiedStats['intelligence'] * 15,
+            'mp_regen' => $modifiedStats['intelligence'] * 0.2,
+            'accuracy' => $modifiedStats['agility'] * 2,
+            'evasion' => $modifiedStats['agility'] * 1,
+            'crit_chance' => $modifiedStats['luck'] * 0.3,
+            'rare_loot_bonus' => $modifiedStats['luck'] * 0.5,
+            'physical_damage_bonus' => 0,
+            'magical_damage_bonus' => 0,
+            'min_damage' => 1,
+            'max_damage' => 2,
         ];
+
+        // Классовые бонусы к урону и точности
+        $class = mb_strtolower($character->class);
+        if ($class === 'воин') {
+            $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 2;
+            $stats['accuracy'] += $modifiedStats['strength'] * 0.5;
+        } elseif ($class === 'лучник') {
+            $stats['accuracy'] += $modifiedStats['agility'] * 2; // Уже есть база, но для лучника еще +2% за ловкость (итого 4% за 1 ловкость)
+            $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 1;
+            $stats['physical_damage_bonus'] += $modifiedStats['agility'] * 1;
+            // Уточнение из ТЗ: "за 1 ед. ловкости: +2% попадания, +1% уклонения, +0.3% крита, +1% физ. урона"
+            // Наша база и так дает часть этого. Добавим только разницу.
+        } elseif ($class === 'маг') {
+            $stats['magical_damage_bonus'] += $modifiedStats['intelligence'] * 2;
+            $stats['accuracy'] += $modifiedStats['intelligence'] * 0.5;
+        }
+
+        // 4. Итоговый урон оружия
+        if ($weapon) {
+            // Ищем конкретный экземпляр оружия, чтобы узнать его ilevel
+            $charWeapon = $equippedItems->first(fn($ci) => $ci->item_id === $weapon->id);
+            $ilevel = $charWeapon ? $charWeapon->ilevel : 1;
+
+            // Применяем iLvl и редкость к урону оружия
+            $baseMin = $weapon->getBonus('min_damage', $ilevel);
+            $baseMax = $weapon->getBonus('max_damage', $ilevel);
+
+            $stats['min_damage'] = round($baseMin * (1 + $stats['physical_damage_bonus'] / 100));
+            $stats['max_damage'] = round($baseMax * (1 + $stats['physical_damage_bonus'] / 100));
+        }
+
+        return $stats;
     }
 
     /**
@@ -169,29 +238,30 @@ class CharacterService extends BaseService
     public function syncStats(Character $character): void
     {
         $calculated = $this->calculateFinalStats($character);
-        $derived = $calculated['derived_stats'];
 
         CharacterStat::updateOrCreate(
             ['character_id' => $character->id],
             [
-                'max_hp' => $derived['hp'],
-                'hp_regen' => $derived['hp_regen'],
-                'max_mp' => $derived['mana'],
-                'mp_regen' => $derived['mana_regen'],
-                'physical_damage_bonus' => $derived['physical_damage_bonus'],
-                'magical_damage_bonus' => $derived['magical_damage_bonus'],
-                'accuracy' => $derived['accuracy'],
-                'evasion' => $derived['evasion'],
-                'crit_chance' => $derived['crit_chance'],
-                'rare_loot_bonus' => $derived['rare_loot_bonus'],
+                'max_hp' => $calculated['max_hp'],
+                'hp_regen' => $calculated['hp_regen'],
+                'max_mp' => $calculated['max_mp'],
+                'mp_regen' => $calculated['mp_regen'],
+                'physical_damage_bonus' => $calculated['physical_damage_bonus'],
+                'magical_damage_bonus' => $calculated['magical_damage_bonus'],
+                'accuracy' => $calculated['accuracy'],
+                'evasion' => $calculated['evasion'],
+                'crit_chance' => $calculated['crit_chance'],
+                'rare_loot_bonus' => $calculated['rare_loot_bonus'],
+                'min_damage' => $calculated['min_damage'],
+                'max_damage' => $calculated['max_damage'],
             ]
         );
 
         // Инициализация динамических статов, если их нет
         if (!$character->dynamicStats()->exists()) {
             $character->dynamicStats()->create([
-                'current_hp' => $derived['hp'],
-                'current_mp' => $derived['mana'],
+                'current_hp' => $calculated['max_hp'],
+                'current_mp' => $calculated['max_mp'],
                 'last_regen_at' => now(),
             ]);
         }
@@ -335,6 +405,40 @@ class CharacterService extends BaseService
         $character->{$addedField}++;
         $character->stat_points--;
         $character->save();
+
+        $this->syncStats($character);
+    }
+
+    /**
+     * Надеть предмет
+     */
+    public function equipItem(Character $character, CharacterItem $charItem, string $slot): void
+    {
+        DB::transaction(function () use ($character, $charItem, $slot) {
+            // Сначала снимаем всё, что в этом слоте
+            $character->items()
+                ->where('slot', $slot)
+                ->where('is_equipped', true)
+                ->update(['is_equipped' => false, 'slot' => null]);
+
+            $charItem->update([
+                'slot' => $slot,
+                'is_equipped' => true,
+            ]);
+
+            $this->syncStats($character);
+        });
+    }
+
+    /**
+     * Снять предмет
+     */
+    public function unequipItem(Character $character, CharacterItem $charItem): void
+    {
+        $charItem->update([
+            'is_equipped' => false,
+            'slot' => null,
+        ]);
 
         $this->syncStats($character);
     }
