@@ -75,6 +75,7 @@ class CharacterService extends BaseService
             'constitution' => 0,
             'intelligence' => 0,
             'luck' => 0,
+            'armor' => 0,
         ];
 
         $weapon = null;
@@ -87,6 +88,10 @@ class CharacterService extends BaseService
             }
 
             foreach ($gearStats as $stat => $value) {
+                if ($stat === 'armor') {
+                    $gearStats[$stat] += $item->armor; // Плоское значение пока без iLvl скейла (уточнить?)
+                    continue;
+                }
                 $gearStats[$stat] += $item->getBonus($stat, $charItem->ilevel);
             }
         }
@@ -105,9 +110,7 @@ class CharacterService extends BaseService
         // 3. Расчет боевых параметров на основе итоговых стат
         $stats = $this->getDerivedStats($modifiedStats);
         
-        // Значения по умолчанию для урона (если нет оружия)
-        $stats['min_damage'] = 1;
-        $stats['max_damage'] = 2;
+        // Инициализация бонусов урона
         $stats['physical_damage_bonus'] = 0;
         $stats['magical_damage_bonus'] = 0;
 
@@ -117,11 +120,9 @@ class CharacterService extends BaseService
             $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 2;
             $stats['accuracy'] += $modifiedStats['strength'] * 0.5;
         } elseif ($class === 'лучник') {
-            $stats['accuracy'] += $modifiedStats['agility'] * 2; // Уже есть база, но для лучника еще +2% за ловкость (итого 4% за 1 ловкость)
+            $stats['accuracy'] += $modifiedStats['agility'] * 2;
             $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 1;
             $stats['physical_damage_bonus'] += $modifiedStats['agility'] * 1;
-            // Уточнение из ТЗ: "за 1 ед. ловкости: +2% попадания, +1% уклонения, +0.3% крита, +1% физ. урона"
-            // Наша база и так дает часть этого. Добавим только разницу.
         } elseif ($class === 'маг') {
             $stats['magical_damage_bonus'] += $modifiedStats['intelligence'] * 2;
             $stats['accuracy'] += $modifiedStats['intelligence'] * 0.5;
@@ -139,9 +140,15 @@ class CharacterService extends BaseService
 
             $stats['min_damage'] = round($baseMin * (1 + $stats['physical_damage_bonus'] / 100));
             $stats['max_damage'] = round($baseMax * (1 + $stats['physical_damage_bonus'] / 100));
+        } else {
+            // Значения по умолчанию для урона (если нет оружия)
+            $stats['min_damage'] = 1;
+            $stats['max_damage'] = 2;
         }
 
-        return $stats;
+        $stats['armor'] = $gearStats['armor'];
+
+        return array_merge($modifiedStats, $stats);
     }
 
     /**
@@ -249,6 +256,7 @@ class CharacterService extends BaseService
                 'rare_loot_bonus' => $calculated['rare_loot_bonus'],
                 'min_damage' => $calculated['min_damage'],
                 'max_damage' => $calculated['max_damage'],
+                'armor' => $calculated['armor'],
             ]
         );
 

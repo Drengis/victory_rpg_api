@@ -21,6 +21,7 @@ class CharacterStat extends Model
         'rare_loot_bonus',
         'min_damage',
         'max_damage',
+        'armor',
     ];
 
     public function character(): BelongsTo

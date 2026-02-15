@@ -20,6 +20,7 @@ class Item extends Model
         'min_damage',
         'max_damage',
         'required_class',
+        'armor',
     ];
 
     protected $casts = [

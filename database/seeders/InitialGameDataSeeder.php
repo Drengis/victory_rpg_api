@@ -101,7 +101,8 @@ class InitialGameDataSeeder extends Seeder
                 'base_price' => 25,
                 'constitution' => 2,
                 'scaling_factor' => 0.08,
-                'required_class' => 'воин'
+                'required_class' => 'воин',
+                'armor' => 10
             ]
         );
 
@@ -113,7 +114,8 @@ class InitialGameDataSeeder extends Seeder
                 'base_price' => 25,
                 'agility' => 2,
                 'scaling_factor' => 0.08,
-                'required_class' => 'лучник'
+                'required_class' => 'лучник',
+                'armor' => 5
             ]
         );
 
@@ -125,7 +127,8 @@ class InitialGameDataSeeder extends Seeder
                 'base_price' => 25,
                 'intelligence' => 2,
                 'scaling_factor' => 0.08,
-                'required_class' => 'маг'
+                'required_class' => 'маг',
+                'armor' => 3
             ]
         );
 

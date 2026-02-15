@@ -13,6 +13,10 @@ class CharacterDynamicStat extends Model
         'current_mp',
         'is_in_combat',
         'last_regen_at',
+        'temp_armor',
+        'temp_evasion',
+        'barrier_hp',
+        'last_combat_log',
     ];
 
     protected $casts = [
