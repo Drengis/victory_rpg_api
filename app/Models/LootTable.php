@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class LootTable extends Model
 {
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'mode'];
 
     public function items()
     {
@@ -15,6 +15,6 @@ class LootTable extends Model
 
     public function enemies()
     {
-        return $this->hasMany(Enemy::class);
+        return $this->belongsToMany(Enemy::class, 'enemy_loot_table');
     }
 }

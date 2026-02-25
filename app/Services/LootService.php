@@ -17,25 +17,53 @@ class LootService extends BaseService
      * Сгенерировать лут для убитого монстра
      * @return array Массив [item_id => quantity]
      */
-    public function generateLoot(Enemy $enemy): array
+    public function generateLoot(Enemy $enemy, ?\App\Models\Character $character = null): array
     {
-        if (!$enemy->loot_table_id) {
+        $lootTables = $enemy->lootTables;
+        if ($lootTables->isEmpty()) {
             return [];
         }
 
-        $items = LootItem::where('loot_table_id', $enemy->loot_table_id)->get();
+        $luckBonus = $character ? ($character->stats->rare_loot_bonus / 100) : 0;
         $rolledLoot = [];
 
-        foreach ($items as $lootItem) {
-            $roll = rand(0, 10000) / 100; // 0.00 - 100.00%
+        foreach ($lootTables as $table) {
+            $items = LootItem::where('loot_table_id', $table->id)->get();
 
-            if ($roll <= $lootItem->chance) {
-                $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
-                
-                if (isset($rolledLoot[$lootItem->item_id])) {
-                    $rolledLoot[$lootItem->item_id] += $quantity;
-                } else {
-                    $rolledLoot[$lootItem->item_id] = $quantity;
+            if ($table->mode === 'one') {
+                // Режим "один предмет": chance используется как вес
+                $totalWeight = $items->sum('chance');
+                $roll = rand(0, (int)($totalWeight * 100)) / 100;
+
+                $cumulative = 0;
+                foreach ($items as $lootItem) {
+                    $effectiveWeight = $lootItem->chance * (1 + $luckBonus);
+                    $cumulative += $effectiveWeight;
+
+                    if ($roll <= $cumulative) {
+                        $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
+                        if (isset($rolledLoot[$lootItem->item_id])) {
+                            $rolledLoot[$lootItem->item_id] += $quantity;
+                        } else {
+                            $rolledLoot[$lootItem->item_id] = $quantity;
+                        }
+                        break;
+                    }
+                }
+            } else {
+                // Режим "each" (по умолчанию): каждый предмет ролится независимо
+                foreach ($items as $lootItem) {
+                    $roll = rand(0, 10000) / 100;
+                    $effectiveChance = $lootItem->chance * (1 + $luckBonus);
+
+                    if ($roll <= $effectiveChance) {
+                        $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
+                        if (isset($rolledLoot[$lootItem->item_id])) {
+                            $rolledLoot[$lootItem->item_id] += $quantity;
+                        } else {
+                            $rolledLoot[$lootItem->item_id] = $quantity;
+                        }
+                    }
                 }
             }
         }
@@ -46,22 +74,30 @@ class LootService extends BaseService
     /**
      * Сгенерировать случайную экипировку на основе уровня монстра
      */
-    public function rollDynamicGear(Enemy $enemy): ?array
+    public function rollDynamicGear(Enemy $enemy, ?\App\Models\Character $character = null): ?array
     {
-        // Базовый шанс на выпадение любой шмотки 5%
-        if (rand(1, 100) > 5) {
+        $luckBonus = $character ? ($character->stats->rare_loot_bonus / 100) : 0;
+        
+        // Базовый шанс на выпадение любой шмотки 5%, масштабируется удачей
+        $baseChance = 5 * (1 + $luckBonus);
+        if (rand(1, 100) > $baseChance) {
             return null;
         }
 
-        // 1. Определяем редкость (Quality) на основе уровня врага
+        // 1. Определяем редкость (Quality) на основе уровня врага и удачи
         $quality = 1; // Common
         $roll = rand(1, 100);
+        
+        // Бонус удачи увеличивает шансы на редкое качество
+        $blueChance = 5 * (1 + $luckBonus);
+        $greenChance25 = 30 * (1 + $luckBonus);
+        $greenChance20 = 20 * (1 + $luckBonus);
 
         if ($enemy->level >= 25) {
-            if ($roll <= 5) $quality = 3; // 5% Blue
-            elseif ($roll <= 30) $quality = 2; // 25% Green
+            if ($roll <= $blueChance) $quality = 3; // Blue
+            elseif ($roll <= $greenChance25) $quality = 2; // Green
         } elseif ($enemy->level >= 10) {
-            if ($roll <= 20) $quality = 2; // 20% Green
+            if ($roll <= $greenChance20) $quality = 2; // Green
         }
 
         // 2. Определяем слот (Type)

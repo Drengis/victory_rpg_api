@@ -34,6 +34,11 @@ class Character extends Model
         'experience' => 0,
         'gold' => 0,
         'stat_points' => 0,
+        'strength' => 5,
+        'agility' => 5,
+        'constitution' => 5,
+        'intelligence' => 5,
+        'luck' => 5,
         'strength_added' => 0,
         'agility_added' => 0,
         'constitution_added' => 0,
@@ -67,4 +72,20 @@ class Character extends Model
     {
         return $this->hasMany(CharacterItem::class)->where('is_equipped', true);
     }
+
+    public function getNextLevelXpAttribute(): int
+    {
+        $level = $this->level;
+        $n_minus_1 = $level - 1;
+        return 100 + (30 * $n_minus_1) + (10 * ($n_minus_1 ** 2));
+    }
+
+    public function getXpPercentageAttribute(): float
+    {
+        $nextXp = $this->next_level_xp;
+        if ($nextXp <= 0) return 0;
+        return min(100, ($this->experience / $nextXp) * 100);
+    }
+
+    protected $appends = ['next_level_xp', 'xp_percentage'];
 }

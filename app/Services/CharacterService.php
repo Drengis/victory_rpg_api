@@ -21,6 +21,19 @@ class CharacterService extends BaseService
     }
 
     /**
+     * Переопределяем метод создания для автоматической синхронизации стат
+     */
+    public function create(array $data): \Illuminate\Database\Eloquent\Model
+    {
+        return DB::transaction(function () use ($data) {
+            $character = parent::create($data);
+            $character->refresh();
+            $this->syncStats($character);
+            return $character;
+        });
+    }
+
+    /**
      * Создать нового персонажа
      */
     public function createCharacter(array $data): Character
@@ -142,8 +155,8 @@ class CharacterService extends BaseService
             $stats['max_damage'] = round($baseMax * (1 + $stats['physical_damage_bonus'] / 100));
         } else {
             // Значения по умолчанию для урона (если нет оружия)
-            $stats['min_damage'] = 1;
-            $stats['max_damage'] = 2;
+            $stats['min_damage'] = 3;
+            $stats['max_damage'] = 7;
         }
 
         $stats['armor'] = $gearStats['armor'];
@@ -165,42 +178,8 @@ class CharacterService extends BaseService
     }
 
     /**
-     * Расчитать производные параметры
+     * Расчитать производные параметры (уже не используется напрямую, см. getDerivedStats в трейте)
      */
-    private function calculateDerivedStats(Character $character, array $finalStats): array
-    {
-        $mainStatBonus = $this->getMainStatBonus($character->class, $finalStats);
-
-        return [
-            'hp' => $finalStats['constitution'] * 10,
-            'hp_regen' => $finalStats['constitution'] * 0.5,
-            'mana' => $finalStats['intelligence'] * 15,
-            'mana_regen' => $finalStats['intelligence'] * 0.2,
-            
-            // Урон (Damage): 
-            // Сила дает 1% к физ. урону всем. Воин получает еще +1% от силы (итого 2%).
-            // Ловкость дает +1% к физ. урону для Лучника.
-            'physical_damage_bonus' => ($finalStats['strength'] * 1) 
-                                        + ($this->isMainStat($character->class, 'strength') ? $finalStats['strength'] * 1 : 0)
-                                        + ($this->isMainStat($character->class, 'agility') ? $finalStats['agility'] * 1 : 0),
-                                        
-            // Интеллект дает 1% к маг. урону всем. Маг получает еще +1% (итого 2%).
-            'magical_damage_bonus' => ($finalStats['intelligence'] * 1) 
-                                        + ($this->isMainStat($character->class, 'intelligence') ? $finalStats['intelligence'] * 1 : 0),
-            
-            // Попадание (Accuracy): Ловкость +1.5%. Ключевой стат еще +0.5%.
-            'accuracy' => ($finalStats['agility'] * 1.5) + ($mainStatBonus['accuracy'] ?? 0),
-            
-            // Уклонение (Evasion): Ловкость +1%, Удача +0.5.
-            'evasion' => ($finalStats['agility'] * 1.0) + ($finalStats['luck'] * 0.5),
-            
-            // Крит: Ловкость +0.3%, Удача +0.1%.
-            'crit_chance' => ($finalStats['agility'] * 0.3) + ($finalStats['luck'] * 0.1),
-            
-            // Редкий лут: Удача +1% (множитель 0.01)
-            'rare_loot_bonus' => $finalStats['luck'] * 0.01,
-        ];
-    }
 
     /**
      * Проверка, является ли характеристика основной для класса
@@ -244,6 +223,11 @@ class CharacterService extends BaseService
         CharacterStat::updateOrCreate(
             ['character_id' => $character->id],
             [
+                'strength' => $calculated['strength'],
+                'agility' => $calculated['agility'],
+                'constitution' => $calculated['constitution'],
+                'intelligence' => $calculated['intelligence'],
+                'luck' => $calculated['luck'],
                 'max_hp' => $calculated['max_hp'],
                 'hp_regen' => $calculated['hp_regen'],
                 'max_mp' => $calculated['max_mp'],

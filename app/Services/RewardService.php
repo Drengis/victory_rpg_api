@@ -21,11 +21,13 @@ class RewardService
     public function rewardCharacter(Character $character, Enemy $enemy): array
     {
         $enemyStats = $this->enemyService->calculateFinalStats($enemy);
+        $luckBonus = $character->stats->rare_loot_bonus / 100;
         
-        $xpReward = $enemyStats['experience_reward'];
-        $goldReward = $enemyStats['gold_reward'];
-        $loot = $this->lootService->generateLoot($enemy);
-        $dynamicGear = $this->lootService->rollDynamicGear($enemy);
+        $xpReward = round($enemyStats['experience_reward'] * (1 + $luckBonus));
+        $goldReward = round($enemyStats['gold_reward'] * (1 + $luckBonus));
+        
+        $loot = $this->lootService->generateLoot($enemy, $character);
+        $dynamicGear = $this->lootService->rollDynamicGear($enemy, $character);
 
         DB::transaction(function () use ($character, $xpReward, $goldReward, $loot, $dynamicGear) {
             // 1. Опыт

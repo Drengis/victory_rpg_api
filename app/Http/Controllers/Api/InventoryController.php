@@ -19,6 +19,30 @@ class InventoryController extends Controller
     }
 
     /**
+     * Получить список предметов персонажа
+     *
+     * @param int $characterId
+     * @return JsonResponse
+     */
+    public function index(int $characterId): JsonResponse
+    {
+        $character = $this->characterService->getById($characterId);
+
+        if ($character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш персонаж'], 403);
+        }
+
+        $items = CharacterItem::with('item')
+            ->where('character_id', $characterId)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $items
+        ]);
+    }
+
+    /**
      * Экипировать предмет
      *
      * @param Request $request

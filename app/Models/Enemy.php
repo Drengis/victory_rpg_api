@@ -19,7 +19,6 @@ class Enemy extends Model
         'max_damage',
         'base_experience',
         'base_gold',
-        'loot_table_id',
     ];
 
     protected $casts = [
@@ -34,11 +33,10 @@ class Enemy extends Model
         'max_damage' => 'integer',
         'base_experience' => 'integer',
         'base_gold' => 'integer',
-        'loot_table_id' => 'integer',
     ];
 
-    public function lootTable()
+    public function lootTables()
     {
-        return $this->belongsTo(LootTable::class);
+        return $this->belongsToMany(LootTable::class, 'enemy_loot_table');
     }
 }

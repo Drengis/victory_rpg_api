@@ -20,8 +20,8 @@ class InitialGameDataSeeder extends Seeder
                 'type' => 'weapon',
                 'quality' => 1,
                 'base_price' => 20,
-                'min_damage' => 2,
-                'max_damage' => 4,
+                'min_damage' => 7,
+                'max_damage' => 12,
                 'strength' => 1,
                 'scaling_factor' => 0.1,
                 'required_class' => 'воин'
@@ -34,8 +34,8 @@ class InitialGameDataSeeder extends Seeder
                 'type' => 'weapon',
                 'quality' => 1,
                 'base_price' => 20,
-                'min_damage' => 2,
-                'max_damage' => 4,
+                'min_damage' => 7,
+                'max_damage' => 12,
                 'agility' => 1,
                 'scaling_factor' => 0.1,
                 'required_class' => 'лучник'
@@ -48,8 +48,8 @@ class InitialGameDataSeeder extends Seeder
                 'type' => 'weapon',
                 'quality' => 1,
                 'base_price' => 20,
-                'min_damage' => 2,
-                'max_damage' => 3,
+                'min_damage' => 7,
+                'max_damage' => 12,
                 'intelligence' => 1,
                 'scaling_factor' => 0.1,
                 'required_class' => 'маг'
@@ -219,30 +219,53 @@ class InitialGameDataSeeder extends Seeder
             ]
         );
 
-        // 2. Таблица лута
-        $lootTable = \App\Models\LootTable::updateOrCreate(['name' => 'Начальный лут']);
-        
+        // 2. Таблицы лута
+        // Общая таблица — начальное снаряжение (15% шанс каждый предмет)
+        $lootTable = \App\Models\LootTable::updateOrCreate(
+            ['name' => 'Начальный лут'],
+            ['mode' => 'one']
+        );
+
+        $gearItems = [
+            $sword, $bow, $staff,
+            $helmetWarrior, $helmetArcher, $helmetMage,
+            $chestWarrior, $chestArcher, $chestMage,
+            $hands, $legs, $feet, $neck, $ring, $belt, $trinket,
+        ];
+
+        foreach ($gearItems as $item) {
+            \App\Models\LootItem::updateOrCreate(
+                ['loot_table_id' => $lootTable->id, 'item_id' => $item->id],
+                [
+                    'chance' => 15.0,
+                    'min_quantity' => 1,
+                    'max_quantity' => 1,
+                ]
+            );
+        }
+
+        // Таблица лута крысы — только хвост (уникальный дроп)
+        $ratLootTable = \App\Models\LootTable::updateOrCreate(
+            ['name' => 'Лут крысы'],
+            ['mode' => 'each']
+        );
+
         \App\Models\LootItem::updateOrCreate(
-            ['loot_table_id' => $lootTable->id, 'item_id' => $tail->id],
+            ['loot_table_id' => $ratLootTable->id, 'item_id' => $tail->id],
             [
                 'chance' => 60.0,
                 'min_quantity' => 1,
-                'max_quantity' => 2
+                'max_quantity' => 2,
             ]
         );
 
-        // Редкий шанс на меч с крысы (для теста)
-        \App\Models\LootItem::updateOrCreate(
-            ['loot_table_id' => $lootTable->id, 'item_id' => $sword->id],
-            [
-                'chance' => 5.0,
-                'min_quantity' => 1,
-                'max_quantity' => 1
-            ]
-        );
+        // Убираем дубли из таблицы крысы (если остались от прошлого сида)
+        \App\Models\LootItem::where('loot_table_id', $ratLootTable->id)
+            ->where('item_id', '!=', $tail->id)
+            ->delete();
 
-        // 3. Монстр
-        \App\Models\Enemy::updateOrCreate(
+        // 3. Монстры (many-to-many лут-таблицы)
+        $rat = \App\Models\Enemy::updateOrCreate(
             ['name' => 'Крыса'],
             [
                 'level' => 1,
@@ -256,8 +279,44 @@ class InitialGameDataSeeder extends Seeder
                 'base_experience' => 20,
                 'base_gold' => 10,
                 'scaling_factor' => 0.1,
-                'loot_table_id' => $lootTable->id
             ]
         );
+        $rat->lootTables()->sync([$lootTable->id, $ratLootTable->id]);
+
+        $slime = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Слизень'],
+            [
+                'level' => 1,
+                'strength' => 2,
+                'agility' => 2,
+                'constitution' => 8,
+                'intelligence' => 5,
+                'luck' => 1,
+                'min_damage' => 2,
+                'max_damage' => 3,
+                'base_experience' => 25,
+                'base_gold' => 5,
+                'scaling_factor' => 0.1,
+            ]
+        );
+        $slime->lootTables()->sync([$lootTable->id]);
+
+        $wolf = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Волк'],
+            [
+                'level' => 2,
+                'strength' => 8,
+                'agility' => 10,
+                'constitution' => 6,
+                'intelligence' => 2,
+                'luck' => 4,
+                'min_damage' => 4,
+                'max_damage' => 6,
+                'base_experience' => 50,
+                'base_gold' => 20,
+                'scaling_factor' => 0.15,
+            ]
+        );
+        $wolf->lootTables()->sync([$lootTable->id]);
     }
 }

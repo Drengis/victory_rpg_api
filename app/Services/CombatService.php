@@ -12,11 +12,13 @@ class CombatService
 {
     protected EnemyService $enemyService;
     protected AbilityService $abilityService;
+    protected RewardService $rewardService;
 
-    public function __construct(EnemyService $enemyService, AbilityService $abilityService)
+    public function __construct(EnemyService $enemyService, AbilityService $abilityService, RewardService $rewardService)
     {
         $this->enemyService = $enemyService;
         $this->abilityService = $abilityService;
+        $this->rewardService = $rewardService;
     }
 
     /**
@@ -26,10 +28,12 @@ class CombatService
     {
         return DB::transaction(function () use ($character, $enemyIds) {
             // 1. Создаем запись боя
+            $firstTurn = rand(1, 100) <= 50 ? 'player' : 'enemies';
+            
             $combat = Combat::create([
                 'character_id' => $character->id,
                 'status' => 'active',
-                'current_turn' => rand(1, 100) <= 50 ? 'player' : 'enemies',
+                'current_turn' => $firstTurn,
                 'turn_number' => 1,
             ]);
 
@@ -51,6 +55,14 @@ class CombatService
             // 3. Помечаем персонажа как "в бою"
             $character->dynamicStats->update(['is_in_combat' => true]);
 
+            // 4. Если враги ходят первыми — обрабатываем их ход сразу
+            if ($firstTurn === 'enemies') {
+                $logs = $this->processEnemiesTurn($combat);
+                $character->dynamicStats->update([
+                    'last_combat_log' => implode("\n", $logs)
+                ]);
+            }
+
             return $combat;
         });
     }
@@ -68,30 +80,91 @@ class CombatService
             $character = $combat->character;
             $stats = $character->stats;
             $participant = CombatParticipant::findOrFail($participantId);
+            $enemy = $participant->enemy;
+            $enemyStats = $this->enemyService->calculateFinalStats($enemy);
 
+            // 1. Проверка на попадание (Меткость атакующего vs Уклонение защитника)
+            // Базовый шанс попадания 85%. Прибавляем меткость игрока, вычитаем уклонение врага.
+            $hitChance = 85 + $stats->accuracy - ($enemyStats['evasion'] ?? 0);
+            $hitChance = max(5, min(95, $hitChance)); // Шанс попадания от 5% до 95%
+            
+            $logs = [];
+            if (rand(1, 100) > $hitChance) {
+                $logs[] = "Вы промахнулись по противнику {$enemy->name}!";
+                $enemyLogs = $this->endPlayerTurn($combat);
+                $logs = array_merge($logs, $enemyLogs);
+
+                return [
+                    'action' => 'attack',
+                    'damage' => 0,
+                    'logs' => $logs,
+                    'status' => $combat->status,
+                ];
+            }
+
+            // 2. Расчет базового урона
             $damage = rand($stats->min_damage, $stats->max_damage);
+            $isCrit = rand(1, 1000) <= ($stats->crit_chance * 10);
+            
+            if ($isCrit) {
+                $damage *= 2;
+            }
+
             $finalDamage = max(1, $damage);
 
             $participant->current_hp -= $finalDamage;
             $participant->save();
 
-            $log = "Вы нанесли {$finalDamage} урона противнику {$participant->enemy->name}.";
+            $log = "Вы нанесли {$finalDamage} урона противнику {$enemy->name}.";
+            if ($isCrit) {
+                $log = "✨ КРИТ! " . $log;
+            }
+            $logs[] = $log;
             
             if ($participant->current_hp <= 0) {
+                $rewards = $this->rewardService->rewardCharacter($character, $enemy);
                 $participant->delete();
-                $log .= " Противник повержен!";
+                
+                // Накапливаем награды в объекте боя
+                $combat->gold_reward += $rewards['gold'];
+                $combat->experience_reward += $rewards['experience'];
+                
+                $currentLoot = $combat->loot_reward ?? [];
+                foreach ($rewards['loot'] as $itemId => $qty) {
+                    $item = \App\Models\Item::find($itemId);
+                    $itemName = $item ? $item->name : "Неизвестный предмет";
+                    
+                    if (isset($currentLoot[$itemName])) {
+                        $currentLoot[$itemName] += $qty;
+                    } else {
+                        $currentLoot[$itemName] = $qty;
+                    }
+                }
+                
+                if (isset($rewards['dynamic_gear'])) {
+                    $item = \App\Models\Item::find($rewards['dynamic_gear']['item_id']);
+                    $itemName = ($item ? $item->name : "Снаряжение") . " (iLvl " . $rewards['dynamic_gear']['ilevel'] . ")";
+                    $currentLoot[$itemName] = 1;
+                }
+                
+                $combat->loot_reward = $currentLoot;
+                $combat->save();
+
+                $logs[] = "☠️ Противник {$enemy->name} повержен! Получено опыта: {$rewards['experience']}, золота: {$rewards['gold']}.";
             }
 
             if ($combat->participants()->count() === 0) {
                 $this->finishCombat($combat, 'won');
             } else {
-                $this->endPlayerTurn($combat);
+                $enemyLogs = $this->endPlayerTurn($combat);
+                $logs = array_merge($logs, $enemyLogs);
             }
 
             return [
                 'action' => 'attack',
                 'damage' => $finalDamage,
-                'log' => $log,
+                'is_crit' => $isCrit,
+                'logs' => $logs,
                 'status' => $combat->status,
             ];
         });
@@ -106,7 +179,7 @@ class CombatService
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        $log = DB::transaction(function () use ($combat) {
+        $abilityLog = DB::transaction(function () use ($combat) {
             $character = $combat->character;
             $totalStats = (new CharacterService())->calculateFinalStats($character);
             $class = mb_strtolower($character->class);
@@ -127,20 +200,22 @@ class CombatService
             // Используем способность
             $result = $this->abilityService->useAbility($ability, $combat, $character, $totalStats);
             
-            $log = "{$result['ability_name']}: эффект {$result['effect_value']}";
+            $log = "🔮 {$result['ability_name']}: эффект +{$result['effect_value']}";
             if ($result['mp_spent'] > 0) {
-                $log .= ". Потрачено маны: {$result['mp_spent']} (осталось: {$result['mp_remaining']})";
+                $log .= " (мана: -{$result['mp_spent']}, осталось: {$result['mp_remaining']})";
             }
             
             return $log;
         });
 
         // Ход врагов вызываем ПОСЛЕ завершения транзакции
-        $this->endPlayerTurn($combat);
+        $enemyLogs = $this->endPlayerTurn($combat);
+        $logs = array_merge([$abilityLog], $enemyLogs);
 
         return [
             'action' => 'defense',
-            'log' => $log,
+            'logs' => $logs,
+            'status' => $combat->status,
         ];
     }
 
@@ -153,23 +228,24 @@ class CombatService
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        $success = rand(1, 100) <= 50;
-
+        $logs = ["Вы попытались сбежать..."];
         if ($success) {
             $this->finishCombat($combat, 'fled');
+            $logs[] = 'Вы успешно сбежали с поля боя!';
             return [
                 'success' => true,
-                'log' => 'Вы успешно сбежали с поля боя!',
+                'logs' => $logs,
                 'status' => 'fled'
             ];
         }
 
-        $log = "Побег не удался! Враги окружают вас.";
-        $this->endPlayerTurn($combat);
+        $logs[] = "Побег не удался! Враги окружают вас.";
+        $enemyLogs = $this->endPlayerTurn($combat);
+        $logs = array_merge($logs, $enemyLogs);
         
         return [
             'success' => false,
-            'log' => $log,
+            'logs' => $logs,
             'status' => 'active'
         ];
     }
@@ -177,16 +253,16 @@ class CombatService
     /**
      * Завершение хода игрока
      */
-    public function endPlayerTurn(Combat $combat): void
+    public function endPlayerTurn(Combat $combat): array
     {
         $combat->update(['current_turn' => 'enemies']);
-        $this->processEnemiesTurn($combat);
+        return $this->processEnemiesTurn($combat);
     }
 
     /**
      * Логика хода врагов
      */
-    public function processEnemiesTurn(Combat $combat): void
+    public function processEnemiesTurn(Combat $combat): array
     {
         $character = $combat->character;
         $dynamic = $character->dynamicStats()->first();
@@ -197,29 +273,46 @@ class CombatService
             $enemy = $participant->enemy;
             $enemyStats = $this->enemyService->calculateFinalStats($enemy);
             
-            // 1. Уклонение
-            $evasionChance = $charStats->evasion + $dynamic->temp_evasion;
-            if (rand(1, 1000) <= ($evasionChance * 10)) {
-                $logs[] = "Враг {$enemy->name} промахнулся!";
+            // 1. Попадание (Меткость врага vs Уклонение игрока)
+            $enemyAccuracy = $enemyStats['accuracy'] ?? 0;
+            $playerEvasion = $charStats->evasion + $dynamic->temp_evasion;
+            
+            $hitChance = 85 + $enemyAccuracy - $playerEvasion;
+            $hitChance = max(5, min(95, $hitChance));
+
+            if (rand(1, 100) > $hitChance) {
+                $logs[] = "💨 Враг {$enemy->name} промахнулся (уклонение)!";
                 continue;
             }
 
-            // 2. Урон
+            // 2. Урон + Криты для мобов
             $damage = rand($enemyStats['min_damage'], $enemyStats['max_damage']);
+            
+            // Крит моба на основе его удачи
+            $critRoll = rand(1, 1000);
+            $isCrit = $critRoll <= (($enemyStats['luck'] * 0.3) * 10);
+            if ($isCrit) {
+                $damage *= 1.5; // Криты мобов чуть слабее (1.5x вместо 2x)
+            }
+
             $totalArmor = $charStats->armor + $dynamic->temp_armor;
-            $finalDamage = max(1, $damage - $totalArmor);
+            $finalDamage = max(1, round($damage - $totalArmor));
 
             // 3. Барьер
-            if ($dynamic->barrier_hp > 0) {
+            if ($dynamic->barrier_hp > 0 && $finalDamage > 0) {
                 $absorbed = min($dynamic->barrier_hp, $finalDamage);
                 $dynamic->barrier_hp -= $absorbed;
                 $finalDamage -= $absorbed;
-                $logs[] = "Магический барьер поглотил {$absorbed} урона.";
+                $logs[] = "🛡️ Магический барьер поглотил {$absorbed} урона от {$enemy->name}.";
             }
 
             if ($finalDamage > 0) {
                 $dynamic->current_hp -= $finalDamage;
-                $logs[] = "Враг {$enemy->name} нанес вам {$finalDamage} урона.";
+                $msg = "💥 Враг {$enemy->name} нанес вам {$finalDamage} урона.";
+                if ($isCrit) $msg = "⚡ КРИТ! " . $msg;
+                $logs[] = $msg;
+            } else {
+                $logs[] = "🛡️ Ваша броня полностью заблокировала атаку {$enemy->name}!";
             }
         }
 
@@ -231,10 +324,13 @@ class CombatService
 
         if ($dynamic->current_hp <= 0) {
             $this->finishCombat($combat, 'lost');
+            $logs[] = "💀 Вы пали в бою...";
         } else {
             $combat->increment('turn_number');
             $combat->update(['current_turn' => 'player']);
         }
+
+        return $logs;
     }
 
     /**

@@ -11,6 +11,13 @@ class Combat extends Model
         'status',
         'current_turn',
         'turn_number',
+        'gold_reward',
+        'experience_reward',
+        'loot_reward',
+    ];
+
+    protected $casts = [
+        'loot_reward' => 'array',
     ];
 
     public function character(): \Illuminate\Database\Eloquent\Relations\BelongsTo

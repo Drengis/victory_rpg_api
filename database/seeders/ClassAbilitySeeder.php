@@ -18,9 +18,9 @@ class ClassAbilitySeeder extends Seeder
             ['class' => 'воин', 'ability_name' => 'Блок'],
             [
                 'ability_type' => 'defense',
-                'mp_cost' => 0,
+                'mp_cost' => 15,
                 'max_uses_per_combat' => null,
-                'cooldown_turns' => 0,
+                'cooldown_turns' => 1,
                 'effect_type' => 'temp_armor',
                 'effect_formula' => 'constitution',
                 'description' => 'Воин принимает защитную стойку, увеличивая броню на значение Выносливости на следующий ход.',
@@ -32,9 +32,9 @@ class ClassAbilitySeeder extends Seeder
             ['class' => 'лучник', 'ability_name' => 'Уклонение'],
             [
                 'ability_type' => 'defense',
-                'mp_cost' => 0,
+                'mp_cost' => 15,
                 'max_uses_per_combat' => null,
-                'cooldown_turns' => 0,
+                'cooldown_turns' => 1,
                 'effect_type' => 'temp_evasion',
                 'effect_formula' => 'agility * 0.5',
                 'description' => 'Лучник готовится к уклонению, увеличивая шанс уклонения на 50% от Ловкости на следующий ход.',
@@ -46,7 +46,7 @@ class ClassAbilitySeeder extends Seeder
             ['class' => 'маг', 'ability_name' => 'Магический Барьер'],
             [
                 'ability_type' => 'defense',
-                'mp_cost' => 30,
+                'mp_cost' => 35,
                 'max_uses_per_combat' => 1,
                 'cooldown_turns' => 0,
                 'effect_type' => 'barrier',

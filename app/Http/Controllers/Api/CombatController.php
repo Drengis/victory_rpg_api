@@ -43,7 +43,17 @@ class CombatController extends Controller
         }
 
         if ($character->dynamicStats->is_in_combat) {
-             return response()->json(['message' => 'Персонаж уже в бою'], 400);
+             $existingCombat = Combat::where('character_id', $character->id)
+                ->where('status', 'active')
+                ->latest()
+                ->first();
+             
+             if ($existingCombat) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $existingCombat->load(['participants.enemy', 'character'])
+                ]);
+             }
         }
 
         try {
@@ -51,7 +61,7 @@ class CombatController extends Controller
             
             return response()->json([
                 'success' => true,
-                'data' => $combat->load(['participants.enemy', 'character'])
+                'data' => $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats'])
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
@@ -135,5 +145,43 @@ class CombatController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Получить состояние боя
+     */
+    public function show(Combat $combat): JsonResponse
+    {
+        if ($combat->character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш бой'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats'])
+        ]);
+    }
+
+    /**
+     * Получить активный бой персонажа
+     */
+    public function active(int $characterId): JsonResponse
+    {
+        $character = $this->characterService->getById($characterId);
+        
+        if ($character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш персонаж'], 403);
+        }
+
+        $combat = Combat::where('character_id', $characterId)
+            ->where('status', 'active')
+            ->with(['participants.enemy', 'character.dynamicStats', 'character.stats'])
+            ->latest()
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => $combat
+        ]);
     }
 }

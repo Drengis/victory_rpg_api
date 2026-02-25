@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Core\BaseController;
 use App\Services\CharacterService;
+use App\Models\Character;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,8 @@ class CharacterController extends BaseController
     protected function getValidationRules(): array
     {
         return [
-            'name' => 'required|string|max:255',
+            'user_id' => 'required|exists:users,id',
+            'name' => 'required|string|max:255|unique:characters,name',
             'class' => 'required|string|in:Воин,Лучник,Маг',
             'strength' => 'integer|min:1',
             'agility' => 'integer|min:1',
@@ -34,17 +36,75 @@ class CharacterController extends BaseController
         ];
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $request->merge([
+            'user_id' => auth()->id(),
+            'with' => ['stats', 'dynamicStats']
+        ]);
+        return parent::index($request);
+    }
+
+    /**
+     * Создать нового персонажа для текущего пользователя
+     */
+    public function store(Request $request): JsonResponse
+    {
+        if (!auth()->check()) {
+            return $this->errorResponse('Необходима авторизация', 401);
+        }
+
+        $request->merge(['user_id' => auth()->id()]);
+        $response = parent::store($request);
+        
+        // Подгружаем статы для ответа
+        if ($response->getStatusCode() === 201) {
+            $data = $response->getData();
+            $character = Character::with(['stats', 'dynamicStats'])->find($data->data->id);
+            return $this->createdResponse($character);
+        }
+
+        return $response;
+    }
+
     /**
      * Переопределяем метод show, чтобы вернуть расчитанные статы
      */
     public function show(int $id, Request $request): JsonResponse
     {
         $character = $this->service->getById($id);
+        $this->service->refreshDynamicStats($character);
         $fullData = $this->service->calculateFinalStats($character);
         
         return $this->successResponse(array_merge(
             $character->toArray(),
             ['calculated' => $fullData]
         ));
+    }
+
+    /**
+     * Распределить очко характеристики
+     */
+    public function distributeStat(Character $character, Request $request): JsonResponse
+    {
+        $request->validate([
+            'stat' => 'required|string|in:strength,agility,constitution,intelligence,luck',
+        ]);
+
+        try {
+            $this->service->distributeStatPoint($character, $request->stat);
+            
+            // Обновляем данные и возвращаем
+            $character->refresh();
+            $this->service->refreshDynamicStats($character);
+            $fullData = $this->service->calculateFinalStats($character);
+
+            return $this->successResponse(array_merge(
+                $character->load(['stats', 'dynamicStats'])->toArray(),
+                ['calculated' => $fullData]
+            ));
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 }

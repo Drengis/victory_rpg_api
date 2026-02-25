@@ -9,6 +9,11 @@ class CharacterStat extends Model
 {
     protected $fillable = [
         'character_id',
+        'strength',
+        'agility',
+        'constitution',
+        'intelligence',
+        'luck',
         'max_hp',
         'hp_regen',
         'max_mp',
