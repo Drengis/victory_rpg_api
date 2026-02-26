@@ -12,7 +12,8 @@ class RewardService
     public function __construct(
         protected CharacterService $characterService,
         protected EnemyService $enemyService,
-        protected LootService $lootService
+        protected LootService $lootService,
+        protected CurrencyService $currencyService
     ) {}
 
     /**
@@ -21,7 +22,7 @@ class RewardService
     public function rewardCharacter(Character $character, Enemy $enemy): array
     {
         $enemyStats = $this->enemyService->calculateFinalStats($enemy);
-        $luckBonus = $character->stats->rare_loot_bonus / 100;
+        $luckBonus = ($character->stats->rare_loot_bonus ?? 0) / 100;
         
         $xpReward = round($enemyStats['experience_reward'] * (1 + $luckBonus));
         $goldReward = round($enemyStats['gold_reward'] * (1 + $luckBonus));
@@ -34,8 +35,7 @@ class RewardService
             $this->characterService->addExperience($character, $xpReward);
 
             // 2. Золото
-            $character->gold += $goldReward;
-            $character->save();
+            $this->currencyService->addGold($character, $goldReward);
 
             // 3. Табличный лут (хвосты и прочее)
             foreach ($loot as $itemId => $quantity) {

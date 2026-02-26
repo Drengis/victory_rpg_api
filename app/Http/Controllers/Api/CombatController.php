@@ -50,9 +50,10 @@ class CombatController extends Controller
              
              if ($existingCombat) {
                 return response()->json([
-                    'success' => true,
+                    'success' => false,
+                    'message' => 'Вы уже в бою',
                     'data' => $existingCombat->load(['participants.enemy', 'character'])
-                ]);
+                ], 400);
              }
         }
 

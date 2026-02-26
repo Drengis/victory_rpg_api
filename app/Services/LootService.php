@@ -76,7 +76,10 @@ class LootService extends BaseService
      */
     public function rollDynamicGear(Enemy $enemy, ?\App\Models\Character $character = null): ?array
     {
-        $luckBonus = $character ? ($character->stats->rare_loot_bonus / 100) : 0;
+        $luckBonus = 0;
+        if ($character && $character->stats) {
+            $luckBonus = $character->stats->rare_loot_bonus / 100;
+        }
         
         // Базовый шанс на выпадение любой шмотки 5%, масштабируется удачей
         $baseChance = 5 * (1 + $luckBonus);

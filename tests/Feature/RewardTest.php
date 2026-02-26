@@ -25,11 +25,7 @@ class RewardTest extends TestCase
     {
         parent::setUp();
         
-        $charService = new CharacterService();
-        $enemyService = new EnemyService();
-        $lootService = new LootService();
-        
-        $this->service = new RewardService($charService, $enemyService, $lootService);
+        $this->service = app(RewardService::class);
     }
 
     public function test_character_receives_scaled_rewards()
@@ -43,6 +39,7 @@ class RewardTest extends TestCase
             'experience' => 0,
             'gold' => 0,
         ]);
+        app(\App\Services\CharacterService::class)->syncStats($character);
 
         // Создаем моба 11 уровня (+100% наград при факторе 0.1)
         $enemy = Enemy::create([
@@ -60,10 +57,10 @@ class RewardTest extends TestCase
 
         $this->service->rewardCharacter($character, $enemy);
 
-        // Ожидаем 20 * 2 = 40 XP и 50 * 2 = 100 Gold
+        // Ожидаем 40 * 1.025 = 41 XP и 100 * 1.025 = 102.5 -> 103 Gold
         $character->refresh();
-        $this->assertEquals(40, $character->experience);
-        $this->assertEquals(100, $character->gold);
+        $this->assertEquals(41, $character->experience);
+        $this->assertEquals(103, $character->gold);
     }
 
     public function test_loot_generation_and_delivery()
@@ -74,6 +71,8 @@ class RewardTest extends TestCase
             'name' => 'LootTester',
             'class' => 'mage',
         ]);
+        app(\App\Services\CharacterService::class)->syncStats($character);
+        app(\App\Services\CharacterService::class)->syncStats($character);
 
         // 1. Создаем таблицу лута
         $lootTable = LootTable::create(['name' => 'Rat Loot']);
@@ -81,7 +80,7 @@ class RewardTest extends TestCase
         // 2. Создаем предмет
         $item = Item::create([
             'name' => 'Rat Tail',
-            'rarity' => 'common',
+            'quality' => 1,
             'type' => 'material',
         ]);
 
@@ -94,12 +93,12 @@ class RewardTest extends TestCase
             'max_quantity' => 2,
         ]);
 
-        // 4. Создаем моба с этой таблицей
+        // 4. Создаем моба
         $enemy = Enemy::create([
             'name' => 'Rat',
-            'loot_table_id' => $lootTable->id,
             'strength' => 5, 'agility' => 5, 'constitution' => 5, 'intelligence' => 5, 'luck' => 5,
         ]);
+        $enemy->lootTables()->attach($lootTable->id);
 
         $reward = $this->service->rewardCharacter($character, $enemy);
 

@@ -13,12 +13,18 @@ class CombatService
     protected EnemyService $enemyService;
     protected AbilityService $abilityService;
     protected RewardService $rewardService;
+    protected CharacterService $characterService;
 
-    public function __construct(EnemyService $enemyService, AbilityService $abilityService, RewardService $rewardService)
-    {
+    public function __construct(
+        EnemyService $enemyService, 
+        AbilityService $abilityService, 
+        RewardService $rewardService,
+        CharacterService $characterService
+    ) {
         $this->enemyService = $enemyService;
         $this->abilityService = $abilityService;
         $this->rewardService = $rewardService;
+        $this->characterService = $characterService;
     }
 
     /**
@@ -228,7 +234,23 @@ class CombatService
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        $logs = ["Вы попытались сбежать..."];
+        $character = $combat->character;
+        $charStats = $character->stats;
+        
+        // 1. Находим самого "быстрого" врага
+        $maxEnemyAgility = 0;
+        foreach ($combat->participants as $participant) {
+            $enemyStats = $this->enemyService->calculateFinalStats($participant->enemy);
+            $maxEnemyAgility = max($maxEnemyAgility, $enemyStats['agility'] ?? 0);
+        }
+
+        // 2. Расчет шанса: Базовый 50% + разница в ловкости
+        $fleeChance = 50 + ($charStats->agility - $maxEnemyAgility) * 2;
+        $fleeChance = max(10, min(90, $fleeChance)); // Шанс от 10% до 90%
+
+        $success = rand(1, 100) <= $fleeChance;
+
+        $logs = ["Вы попытались сбежать (шанс: {$fleeChance}%)..."];
         if ($success) {
             $this->finishCombat($combat, 'fled');
             $logs[] = 'Вы успешно сбежали с поля боя!';
@@ -255,6 +277,9 @@ class CombatService
      */
     public function endPlayerTurn(Combat $combat): array
     {
+        // Начисляем регенерацию за раунд
+        $this->characterService->applyCombatRoundRegen($combat->character);
+        
         $combat->update(['current_turn' => 'enemies']);
         return $this->processEnemiesTurn($combat);
     }

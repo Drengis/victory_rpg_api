@@ -12,7 +12,7 @@ trait CalculatesDerivedStats
         return [
             'max_hp' => (int) ($baseStats['constitution'] * 10),
             'hp_regen' => (float) ($baseStats['constitution'] * 0.5),
-            'max_mp' => (int) ($baseStats['intelligence'] * 10),
+            'max_mp' => (int) ($baseStats['intelligence'] * 15),
             'mp_regen' => (float) ($baseStats['intelligence'] * 0.2),
             'accuracy' => (float) ($baseStats['agility'] * 2),
             'evasion' => (float) ($baseStats['agility'] * 1),

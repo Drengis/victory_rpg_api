@@ -80,10 +80,7 @@ class CombatApiTest extends TestCase
     public function test_cannot_start_combat_if_already_in_combat()
     {
         // Start first combat
-        (new \App\Services\CombatService(
-            new \App\Services\EnemyService(), 
-            new \App\Services\AbilityService()
-        ))->startCombat($this->character, [$this->enemy->id]);
+        app(\App\Services\CombatService::class)->startCombat($this->character, [$this->enemy->id]);
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
             ->postJson('/api/combat/start', [
@@ -97,10 +94,7 @@ class CombatApiTest extends TestCase
     public function test_can_attack()
     {
         // Start combat manually
-        $combat = (new \App\Services\CombatService(
-            new \App\Services\EnemyService(), 
-            new \App\Services\AbilityService()
-        ))->startCombat($this->character, [$this->enemy->id]);
+        $combat = app(\App\Services\CombatService::class)->startCombat($this->character, [$this->enemy->id]);
 
         // Force player turn
         $combat->update(['current_turn' => 'player']);
@@ -118,10 +112,8 @@ class CombatApiTest extends TestCase
 
     public function test_cannot_attack_on_enemy_turn()
     {
-        $combat = (new \App\Services\CombatService(
-            new \App\Services\EnemyService(), 
-            new \App\Services\AbilityService()
-        ))->startCombat($this->character, [$this->enemy->id]);
+        // Start combat
+        $combat = app(\App\Services\CombatService::class)->startCombat($this->character, [$this->enemy->id]);
 
         $combat->update(['current_turn' => 'enemies']);
         $participant = $combat->participants->first();

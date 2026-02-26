@@ -102,7 +102,7 @@ class InitialGameDataSeeder extends Seeder
                 'constitution' => 2,
                 'scaling_factor' => 0.08,
                 'required_class' => 'воин',
-                'armor' => 10
+                'armor' => 4
             ]
         );
 
@@ -115,7 +115,7 @@ class InitialGameDataSeeder extends Seeder
                 'agility' => 2,
                 'scaling_factor' => 0.08,
                 'required_class' => 'лучник',
-                'armor' => 5
+                'armor' => 3
             ]
         );
 
@@ -128,7 +128,7 @@ class InitialGameDataSeeder extends Seeder
                 'intelligence' => 2,
                 'scaling_factor' => 0.08,
                 'required_class' => 'маг',
-                'armor' => 3
+                'armor' => 2
             ]
         );
 
@@ -277,7 +277,7 @@ class InitialGameDataSeeder extends Seeder
                 'min_damage' => 1,
                 'max_damage' => 2,
                 'base_experience' => 20,
-                'base_gold' => 10,
+                'base_gold' => 5,
                 'scaling_factor' => 0.1,
             ]
         );
@@ -295,7 +295,7 @@ class InitialGameDataSeeder extends Seeder
                 'min_damage' => 2,
                 'max_damage' => 3,
                 'base_experience' => 25,
-                'base_gold' => 5,
+                'base_gold' => 7,
                 'scaling_factor' => 0.1,
             ]
         );
@@ -313,7 +313,7 @@ class InitialGameDataSeeder extends Seeder
                 'min_damage' => 4,
                 'max_damage' => 6,
                 'base_experience' => 50,
-                'base_gold' => 20,
+                'base_gold' => 12,
                 'scaling_factor' => 0.15,
             ]
         );

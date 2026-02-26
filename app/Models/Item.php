@@ -96,4 +96,47 @@ class Item extends Model
     {
         return $this->quality <= self::QUALITY_UNCOMMON;
     }
+
+    /**
+     * Получить список активных бонусов предмета в читаемом виде
+     */
+    public function getBonusesList(int $ilevel = 1): array
+    {
+        $bonuses = [];
+        
+        $stats = [
+            'strength' => 'Сила',
+            'agility' => 'Ловкость',
+            'constitution' => 'Выносливость',
+            'intelligence' => 'Интеллект',
+            'luck' => 'Удача',
+            'armor' => 'Броня',
+        ];
+
+        foreach ($stats as $key => $label) {
+            $value = $this->getBonus($key, $ilevel);
+            if ($value > 0) {
+                $bonuses[] = "+{$value} {$label}";
+            }
+        }
+
+        if ($this->type === 'weapon') {
+            $min = $this->getBonus('min_damage', $ilevel);
+            $max = $this->getBonus('max_damage', $ilevel);
+            $bonuses[] = "Урон: {$min}-{$max}";
+        }
+
+        return $bonuses;
+    }
+
+    /**
+     * Добавление display_stats в JSON
+     */
+    public function toArray()
+    {
+        $array = parent::toArray();
+        // По умолчанию для iLvl 1, если не указано иное
+        $array['display_stats'] = $this->getBonusesList($this->pivot->ilevel ?? 1);
+        return $array;
+    }
 }

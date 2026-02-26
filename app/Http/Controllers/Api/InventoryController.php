@@ -12,10 +12,12 @@ use Illuminate\Support\Facades\Auth;
 class InventoryController extends Controller
 {
     protected CharacterService $characterService;
+    protected \App\Services\ShopService $shopService;
 
-    public function __construct(CharacterService $characterService)
+    public function __construct(CharacterService $characterService, \App\Services\ShopService $shopService)
     {
         $this->characterService = $characterService;
+        $this->shopService = $shopService;
     }
 
     /**
@@ -52,7 +54,7 @@ class InventoryController extends Controller
     {
         $request->validate([
             'character_item_id' => 'required|exists:character_items,id',
-            'slot' => 'required|string|in:weapon,head,chest,Legs,hands,feet,neck,ring,trinket,belt', // Уточнить список слотов
+            'slot' => 'required|string|in:weapon,head,helmet,chest,legs,hands,feet,neck,ring,trinket,belt', // Уточнить список слотов
         ]);
 
         $charItem = CharacterItem::with('character')->findOrFail($request->character_item_id);
@@ -90,6 +92,37 @@ class InventoryController extends Controller
         try {
             $this->characterService->unequipItem($charItem->character, $charItem);
             return response()->json(['success' => true, 'message' => 'Предмет снят']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Продать предмет
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function sell(Request $request): JsonResponse
+    {
+        $request->validate([
+            'character_item_id' => 'required|exists:character_items,id',
+            'quantity' => 'integer|min:1',
+        ]);
+
+        $charItem = CharacterItem::with(['character', 'item'])->findOrFail($request->character_item_id);
+
+        if ($charItem->character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш предмет'], 403);
+        }
+
+        try {
+            $result = $this->shopService->sellItem(
+                $charItem->character, 
+                $charItem, 
+                $request->input('quantity', 1)
+            );
+            return response()->json(['success' => true, 'data' => $result]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }

@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import api from '../api/axios';
 import { Navigate, useNavigate } from 'react-router-dom';
 import StatBar from '../components/StatBar';
-import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles } from 'lucide-react';
+import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 
 const DashboardPage: React.FC = () => {
@@ -158,7 +158,7 @@ const DashboardPage: React.FC = () => {
                 {/* Left Column: Actions */}
                 <div className="lg:col-span-2 space-y-6">
                     <h3 className="text-xl font-bold text-slate-300 px-1">Где приключения?</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <button
                             onClick={() => navigate('/combat')}
                             className="group p-8 bg-amber-600 hover:bg-amber-500 rounded-3xl text-left transition-all shadow-xl shadow-amber-900/20 flex items-center gap-6"
@@ -182,6 +182,19 @@ const DashboardPage: React.FC = () => {
                             <div>
                                 <h4 className="text-2xl font-bold text-slate-100 mb-1">Инвентарь</h4>
                                 <p className="text-slate-500 text-sm">Вещи, статы и снаряжение</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/shops')}
+                            className="group p-8 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl text-left transition-all flex items-center gap-6"
+                        >
+                            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center group-hover:bg-slate-700 transition-colors">
+                                <Store className="w-8 h-8 text-slate-400 group-hover:text-amber-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-2xl font-bold text-slate-100 mb-1">Магазин</h4>
+                                <p className="text-slate-500 text-sm">Торговые лавки города</p>
                             </div>
                         </button>
                     </div>

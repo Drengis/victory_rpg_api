@@ -23,11 +23,7 @@ class DynamicLootTest extends TestCase
     {
         parent::setUp();
         
-        $charService = new CharacterService();
-        $enemyService = new EnemyService();
-        $lootService = new LootService();
-        
-        $this->service = new RewardService($charService, $enemyService, $lootService);
+        $this->service = app(RewardService::class);
 
         // Создаем шаблоны для всех типов, чтобы ролл не промахивался мимо созданных вещей
         $types = ['weapon', 'head', 'chest', 'hands', 'legs', 'feet', 'belt', 'neck', 'ring', 'trinket'];
@@ -41,6 +37,7 @@ class DynamicLootTest extends TestCase
     {
         $user = User::factory()->create();
         $character = Character::create(['user_id' => $user->id, 'name' => 'Noob', 'class' => 'warrior']);
+        app(\App\Services\CharacterService::class)->syncStats($character);
         
         // Крыса 1 уровня
         $enemy = Enemy::create([
@@ -71,6 +68,7 @@ class DynamicLootTest extends TestCase
 
         $user = User::factory()->create();
         $character = Character::create(['user_id' => $user->id, 'name' => 'Pro', 'class' => 'warrior']);
+        app(\App\Services\CharacterService::class)->syncStats($character);
 
         $droppedGreen = false;
         for ($i = 0; $i < 500; $i++) {
@@ -96,6 +94,7 @@ class DynamicLootTest extends TestCase
 
         $user = User::factory()->create();
         $character = Character::create(['user_id' => $user->id, 'name' => 'LvlTester', 'class' => 'warrior']);
+        app(\App\Services\CharacterService::class)->syncStats($character);
 
         $foundVaryingIlevel = false;
         $baseIlevel = 10;

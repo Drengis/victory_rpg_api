@@ -5,11 +5,29 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import type { CharacterItem } from '../types/game';
 import {
     Package, Sword, Shield, Trash2, ArrowUpCircle,
-    Loader2, Info
+    Loader2, Info, Coins, Sparkles
 } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
+import { sellItem } from '../api/shopApi';
 
 const InventoryPage: React.FC = () => {
+    // ... (внутри компонента)
+    const handleSell = async (itemId: number) => {
+        if (!window.confirm('Вы уверены, что хотите продать этот предмет?')) return;
+
+        setActionLoading(itemId);
+        try {
+            await sellItem(itemId);
+            // Обновляем данные персонажа и инвентарь
+            const charRes = await api.get(`/characters/${currentCharacter.id}`);
+            updateCharacterData(charRes.data.data);
+            await fetchInventory();
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Ошибка продажи');
+        } finally {
+            setActionLoading(null);
+        }
+    };
     const { currentCharacter, updateCharacterData } = useGameStore();
     const [items, setItems] = useState<CharacterItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -132,6 +150,15 @@ const InventoryPage: React.FC = () => {
                                                 <p className={`text-sm font-bold truncate ${item ? 'text-slate-100' : 'text-slate-800'}`}>
                                                     {item ? item.item.name : 'Пусто'}
                                                 </p>
+                                                {item && item.item.display_stats && (
+                                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                                                        {item.item.display_stats.slice(0, 2).map((s, i) => (
+                                                            <span key={i} className="text-[8px] text-amber-500/60 font-medium">
+                                                                {s}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             {item && (
                                                 <button
@@ -184,8 +211,27 @@ const InventoryPage: React.FC = () => {
                                             )}
                                         </div>
                                         <h4 className="text-xs font-bold text-slate-200 truncate mb-1" title={item.item.name}>{item.item.name}</h4>
-                                        <div className="flex items-center justify-between mt-2">
+
+                                        {/* Item Stats */}
+                                        {item.item.display_stats && item.item.display_stats.length > 0 && (
+                                            <div className="mt-2 space-y-0.5">
+                                                {item.item.display_stats.map((stat, idx) => (
+                                                    <div key={idx} className="flex items-center gap-1 text-[9px] font-medium text-amber-500/80">
+                                                        <Sparkles className="w-2.5 h-2.5 opacity-40" />
+                                                        {stat}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center justify-between mt-auto pt-2">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase">{item.item.type}</span>
+                                            {item.item.base_price > 0 && (
+                                                <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                                                    <Coins className="w-3 h-3" />
+                                                    {Math.floor(item.item.base_price * 0.5)}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Action Overlay */}
@@ -201,6 +247,16 @@ const InventoryPage: React.FC = () => {
                                                     {actionLoading === item.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Надеть'}
                                                 </button>
                                             )}
+
+                                            <button
+                                                onClick={() => handleSell(item.id)}
+                                                disabled={actionLoading !== null}
+                                                className="w-full py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2"
+                                            >
+                                                {actionLoading === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Coins className="w-3 h-3" />}
+                                                Продать
+                                            </button>
+
                                             <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1">
                                                 <Info className="w-3 h-3" /> Инфо
                                             </button>

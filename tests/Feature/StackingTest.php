@@ -25,11 +25,7 @@ class StackingTest extends TestCase
     {
         parent::setUp();
         
-        $charService = new CharacterService();
-        $enemyService = new EnemyService();
-        $lootService = new LootService();
-        
-        $this->service = new RewardService($charService, $enemyService, $lootService);
+        $this->service = app(RewardService::class);
     }
 
     public function test_materials_are_stacked_in_inventory()
@@ -40,6 +36,9 @@ class StackingTest extends TestCase
             'name' => 'Stacker',
             'class' => 'warrior',
         ]);
+        app(\App\Services\CharacterService::class)->syncStats($character);
+        $character->refresh();
+        $this->assertNotNull($character->stats, 'Character stats should not be null after sync');
 
         $item = Item::create([
             'name' => 'Rat Tail',
@@ -58,9 +57,9 @@ class StackingTest extends TestCase
 
         $enemy = Enemy::create([
             'name' => 'Rat',
-            'loot_table_id' => $lootTable->id,
             'strength' => 5, 'agility' => 5, 'constitution' => 5, 'intelligence' => 5, 'luck' => 5,
         ]);
+        $enemy->lootTables()->attach($lootTable->id);
 
         // Убиваем крысу дважды
         $this->service->rewardCharacter($character, $enemy);
@@ -79,6 +78,8 @@ class StackingTest extends TestCase
             'name' => 'GearTester',
             'class' => 'warrior',
         ]);
+        app(\App\Services\CharacterService::class)->syncStats($character);
+        $character->refresh();
 
         $item = Item::create([
             'name' => 'Rusty Sword',
@@ -97,9 +98,9 @@ class StackingTest extends TestCase
 
         $enemy = Enemy::create([
             'name' => 'Boss',
-            'loot_table_id' => $lootTable->id,
             'strength' => 5, 'agility' => 5, 'constitution' => 5, 'intelligence' => 5, 'luck' => 5,
         ]);
+        $enemy->lootTables()->attach($lootTable->id);
 
         // Убиваем босса дважды
         $this->service->rewardCharacter($character, $enemy);

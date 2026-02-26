@@ -46,6 +46,21 @@ export interface Item {
     constitution?: number;
     intelligence?: number;
     luck?: number;
+    display_stats?: string[];
+}
+
+export interface Shop {
+    id: number;
+    name: string;
+    description: string;
+    items?: Item[];
+}
+
+export interface ShopItem extends Item {
+    pivot: {
+        price_override: number | null;
+        ilevel: number;
+    };
 }
 
 export interface CharacterItem {

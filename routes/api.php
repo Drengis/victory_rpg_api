@@ -26,7 +26,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/inventory/{character}', [\App\Http\Controllers\Api\InventoryController::class, 'index']);
     Route::post('/inventory/equip', [\App\Http\Controllers\Api\InventoryController::class, 'equip']);
     Route::post('/inventory/unequip', [\App\Http\Controllers\Api\InventoryController::class, 'unequip']);
+    Route::post('/inventory/sell', [\App\Http\Controllers\Api\InventoryController::class, 'sell']);
 
     // Enemies
     Route::apiResource('enemies', \App\Http\Controllers\Api\EnemyController::class)->only(['index', 'show']);
+
+    // Shops
+    Route::get('/shops', [\App\Http\Controllers\Api\ShopController::class, 'index']);
+    Route::get('/shops/{shop}', [\App\Http\Controllers\Api\ShopController::class, 'show']);
+    Route::post('/shops/{shop}/buy', [\App\Http\Controllers\Api\ShopController::class, 'buy']);
 });

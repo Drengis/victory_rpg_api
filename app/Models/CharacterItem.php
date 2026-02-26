@@ -31,4 +31,16 @@ class CharacterItem extends Model
     {
         return $this->belongsTo(Item::class);
     }
+
+    /**
+     * Добавление характеристик предмета с учетом iLvl в JSON
+     */
+    public function toArray()
+    {
+        $array = parent::toArray();
+        if ($this->relationLoaded('item') && $this->item) {
+            $array['item']['display_stats'] = $this->item->getBonusesList($this->ilevel);
+        }
+        return $array;
+    }
 }
