@@ -7,7 +7,6 @@ import {
     Package, Sword, Shield, Trash2, ArrowUpCircle,
     Loader2, Info, Coins, Sparkles
 } from 'lucide-react';
-import { formatNumber } from '../lib/utils';
 import { sellItem } from '../api/shopApi';
 
 const InventoryPage: React.FC = () => {
@@ -139,17 +138,24 @@ const InventoryPage: React.FC = () => {
                                 const item = getEquippedInSlot(slot.id);
                                 return (
                                     <div key={slot.id} className="group relative">
-                                        <div className={`p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${item ? 'bg-slate-800 border-amber-500/50 shadow-lg shadow-amber-900/10' : 'bg-slate-950/50 border-dashed border-slate-800'
+                                        <div className={`p-4 rounded-2xl border-2 transition-all flex items-start gap-4 ${item ? 'bg-slate-800 border-amber-500/50 shadow-lg shadow-amber-900/10' : 'bg-slate-950/50 border-dashed border-slate-800'
                                             }`}>
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-900 text-slate-700'
+                                            <div className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${item ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-900 text-slate-700'
                                                 }`}>
                                                 {slot.icon}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[10px] uppercase font-bold text-slate-600 truncate">{slot.name}</p>
-                                                <p className={`text-sm font-bold truncate ${item ? 'text-slate-100' : 'text-slate-800'}`}>
-                                                    {item ? item.item.name : 'Пусто'}
-                                                </p>
+                                                <p className="text-[10px] uppercase font-bold text-slate-600">{slot.name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className={`text-sm font-bold ${item ? 'text-slate-100' : 'text-slate-800'}`}>
+                                                        {item ? item.item.name : 'Пусто'}
+                                                    </p>
+                                                    {item && (
+                                                        <span className="text-[9px] bg-slate-900/50 text-slate-500 px-1 rounded font-mono border border-slate-800">
+                                                            Lvl {item.ilevel}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {item && item.item.display_stats && (
                                                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
                                                         {item.item.display_stats.slice(0, 2).map((s, i) => (
@@ -210,7 +216,10 @@ const InventoryPage: React.FC = () => {
                                                 </span>
                                             )}
                                         </div>
-                                        <h4 className="text-xs font-bold text-slate-200 truncate mb-1" title={item.item.name}>{item.item.name}</h4>
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <h4 className="text-xs font-bold text-slate-200 truncate" title={item.item.name}>{item.item.name}</h4>
+                                            <span className="text-[9px] font-mono text-slate-500">Lvl {item.ilevel}</span>
+                                        </div>
 
                                         {/* Item Stats */}
                                         {item.item.display_stats && item.item.display_stats.length > 0 && (

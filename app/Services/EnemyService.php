@@ -18,9 +18,9 @@ class EnemyService extends BaseService
     /**
      * Расчитать полные характеристики монстра
      */
-    public function calculateFinalStats(Enemy $enemy): array
+    public function calculateFinalStats(Enemy $enemy, ?int $targetLevel = null): array
     {
-        $level = $enemy->level ?? 1;
+        $level = $targetLevel ?? ($enemy->level ?? 1);
         $scaling = $enemy->scaling_factor ?? 0.1;
 
         // Масштабируем статы от уровня: Base * (1 + (Lvl-1) * Factor)

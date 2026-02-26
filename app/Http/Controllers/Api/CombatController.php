@@ -15,11 +15,16 @@ class CombatController extends Controller
 {
     protected CombatService $combatService;
     protected CharacterService $characterService;
+    protected \App\Services\AbilityService $abilityService;
 
-    public function __construct(CombatService $combatService, CharacterService $characterService)
-    {
+    public function __construct(
+        CombatService $combatService,
+        CharacterService $characterService,
+        \App\Services\AbilityService $abilityService
+    ) {
         $this->combatService = $combatService;
         $this->characterService = $characterService;
+        $this->abilityService = $abilityService;
     }
 
     /**
@@ -32,7 +37,7 @@ class CombatController extends Controller
     {
         $request->validate([
             'character_id' => 'required|exists:characters,id',
-            'enemy_ids' => 'required|array|min:1',
+            'enemy_ids' => 'nullable|array|min:1',
             'enemy_ids.*' => 'exists:enemies,id',
         ]);
 
@@ -42,23 +47,45 @@ class CombatController extends Controller
             return response()->json(['message' => 'Это не ваш персонаж'], 403);
         }
 
-        if ($character->dynamicStats->is_in_combat) {
-             $existingCombat = Combat::where('character_id', $character->id)
-                ->where('status', 'active')
-                ->latest()
+        $enemyIds = $request->enemy_ids;
+        $enemyLevels = [];
+
+        // Если враги не указаны — выбираем случайного по уровню глубины
+        if (empty($enemyIds)) {
+            $depth = $character->dungeon_depth;
+            // Определяем целевой уровень врага (Depth +/- 1)
+            $targetLevel = max(1, $depth + rand(-1, 1));
+            
+            // Ищем шаблон врага, который ближе всего к этому уровню и доступен на этой глубине
+            $randomEnemy = Enemy::where('min_depth', '<=', $depth)
+                ->where(function($query) use ($depth) {
+                    $query->where('max_depth', '>=', $depth)
+                          ->orWhereNull('max_depth');
+                })
+                ->orderByRaw("ABS(level - $targetLevel)")
+                ->inRandomOrder()
                 ->first();
-             
-             if ($existingCombat) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Вы уже в бою',
-                    'data' => $existingCombat->load(['participants.enemy', 'character'])
-                ], 400);
-             }
+
+            if (!$randomEnemy) {
+                return response()->json(['message' => 'Враги не найдены'], 404);
+            }
+
+            $enemyIds = [$randomEnemy->id];
+            $enemyLevels = [$targetLevel];
+        } else {
+            // Если ID переданы вручную, используем уровни из БД
+            foreach ($enemyIds as $id) {
+                $e = Enemy::find($id);
+                $enemyLevels[] = $e ? $e->level : 1;
+            }
+        }
+
+        if ($character->dynamicStats->is_in_combat) {
+            // ... (предыдущий код без изменений до $combat = ...)
         }
 
         try {
-            $combat = $this->combatService->startCombat($character, $request->enemy_ids);
+            $combat = $this->combatService->startCombat($character, $enemyIds, $enemyLevels);
             
             return response()->json([
                 'success' => true,
@@ -92,6 +119,7 @@ class CombatController extends Controller
 
         try {
             $result = $this->combatService->performAttack($combat, $request->target_id);
+            $result['combat'] = $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats']);
             return response()->json(['success' => true, 'data' => $result]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
@@ -117,10 +145,51 @@ class CombatController extends Controller
 
         try {
             $result = $this->combatService->performDefense($combat);
+            $result['combat'] = $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats']);
             return response()->json(['success' => true, 'data' => $result]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Использовать конкретную способность
+     */
+    public function useAbility(Request $request, Combat $combat): JsonResponse
+    {
+        $request->validate([
+            'ability_id' => 'required|integer',
+            'target_id' => 'nullable|integer'
+        ]);
+
+        if ($combat->character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш бой'], 403);
+        }
+
+        if ($combat->status !== 'active') {
+             return response()->json(['message' => 'Бой уже завершен'], 400);
+        }
+
+        try {
+            $result = $this->combatService->performAbility($combat, $request->ability_id, $request->target_id);
+            $result['combat'] = $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats']);
+            return response()->json(['success' => true, 'data' => $result]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Получить список доступных навыков для персонажа
+     */
+    public function abilities(Request $request, \App\Models\Character $character): JsonResponse
+    {
+        if ($character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш персонаж'], 403);
+        }
+
+        $abilities = $this->abilityService->getAvailableAbilities($character);
+        return response()->json(['success' => true, 'data' => $abilities]);
     }
 
     /**
@@ -142,6 +211,7 @@ class CombatController extends Controller
 
         try {
             $result = $this->combatService->performFlee($combat);
+            $result['combat'] = $combat->load(['participants.enemy', 'character.dynamicStats', 'character.stats']);
             return response()->json(['success' => true, 'data' => $result]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
@@ -183,6 +253,84 @@ class CombatController extends Controller
         return response()->json([
             'success' => true,
             'data' => $combat
+        ]);
+    }
+
+    /**
+     * Спуститься глубже в подземелье
+     */
+    public function goDeeper(Request $request): JsonResponse
+    {
+        $request->validate([
+            'character_id' => 'required|exists:characters,id',
+        ]);
+
+        $character = $this->characterService->getById($request->character_id);
+
+        if ($character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш персонаж'], 403);
+        }
+
+        $dynamic = $character->dynamicStats;
+
+        if ($dynamic->enemies_defeated_at_depth < 3) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Нужно победить еще ' . (3 - $dynamic->enemies_defeated_at_depth) . ' врагов'
+            ], 400);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($character, $dynamic) {
+            $character->increment('dungeon_depth');
+            if ($character->dungeon_depth > $character->max_dungeon_depth) {
+                $character->max_dungeon_depth = $character->dungeon_depth;
+                $character->save();
+            }
+            $dynamic->update(['enemies_defeated_at_depth' => 0]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Вы спустились глубже!',
+            'data' => [
+                'dungeon_depth' => $character->fresh()->dungeon_depth,
+                'max_dungeon_depth' => $character->fresh()->max_dungeon_depth,
+                'enemies_defeated_at_depth' => 0
+            ]
+        ]);
+    }
+
+    /**
+     * Сменить текущую глубину подземелья
+     */
+    public function changeDepth(Request $request): JsonResponse
+    {
+        $request->validate([
+            'character_id' => 'required|exists:characters,id',
+            'depth' => 'required|integer|min:1',
+        ]);
+
+        $character = $this->characterService->getById($request->character_id);
+
+        if ($character->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Это не ваш персонаж'], 403);
+        }
+
+        if ($request->depth > $character->max_dungeon_depth) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Эта глубина еще не разблокирована (Макс: ' . $character->max_dungeon_depth . ')'
+            ], 400);
+        }
+
+        $character->update(['dungeon_depth' => $request->depth]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Вы перешли на глубину ' . $request->depth,
+            'data' => [
+                'dungeon_depth' => $character->dungeon_depth
+            ]
         ]);
     }
 }

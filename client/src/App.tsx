@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import CombatPage from './pages/CombatPage';
 import InventoryPage from './pages/InventoryPage';
 import ShopsPage from './pages/ShopsPage';
+import AbilitiesPage from './pages/AbilitiesPage';
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -51,6 +52,10 @@ function App() {
           <Route
             path="/shops"
             element={isAuthenticated ? <ShopsPage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/abilities"
+            element={isAuthenticated ? <AbilitiesPage /> : <Navigate to="/login" />}
           />
 
           {/* Redirects */}

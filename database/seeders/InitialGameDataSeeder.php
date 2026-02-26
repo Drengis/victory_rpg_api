@@ -219,11 +219,41 @@ class InitialGameDataSeeder extends Seeder
             ]
         );
 
+        $goblinEar = \App\Models\Item::updateOrCreate(
+            ['name' => 'Ухо гоблина'],
+            [
+                'type' => 'material',
+                'quality' => 1,
+                'base_price' => 5,
+                'scaling_factor' => 0.1
+            ]
+        );
+
+        $skeletonBone = \App\Models\Item::updateOrCreate(
+            ['name' => 'Кость скелета'],
+            [
+                'type' => 'material',
+                'quality' => 1,
+                'base_price' => 8,
+                'scaling_factor' => 0.12
+            ]
+        );
+
+        $orcTusk = \App\Models\Item::updateOrCreate(
+            ['name' => 'Клык орка'],
+            [
+                'type' => 'material',
+                'quality' => 2,
+                'base_price' => 15,
+                'scaling_factor' => 0.15
+            ]
+        );
+
         // 2. Таблицы лута
         // Общая таблица — начальное снаряжение (15% шанс каждый предмет)
         $lootTable = \App\Models\LootTable::updateOrCreate(
             ['name' => 'Начальный лут'],
-            ['mode' => 'one']
+            ['mode' => 'one', 'chance' => 15.0]
         );
 
         $gearItems = [
@@ -264,6 +294,36 @@ class InitialGameDataSeeder extends Seeder
             ->where('item_id', '!=', $tail->id)
             ->delete();
 
+        // Таблица лута гоблина
+        $goblinLootTable = \App\Models\LootTable::updateOrCreate(
+            ['name' => 'Лут гоблина'],
+            ['mode' => 'each']
+        );
+        \App\Models\LootItem::updateOrCreate(
+            ['loot_table_id' => $goblinLootTable->id, 'item_id' => $goblinEar->id],
+            ['chance' => 40.0, 'min_quantity' => 1, 'max_quantity' => 1]
+        );
+
+        // Таблица лута скелета
+        $skeletonLootTable = \App\Models\LootTable::updateOrCreate(
+            ['name' => 'Лут скелета'],
+            ['mode' => 'each']
+        );
+        \App\Models\LootItem::updateOrCreate(
+            ['loot_table_id' => $skeletonLootTable->id, 'item_id' => $skeletonBone->id],
+            ['chance' => 50.0, 'min_quantity' => 1, 'max_quantity' => 3]
+        );
+
+        // Таблица лута орка
+        $orcLootTable = \App\Models\LootTable::updateOrCreate(
+            ['name' => 'Лут орка'],
+            ['mode' => 'each']
+        );
+        \App\Models\LootItem::updateOrCreate(
+            ['loot_table_id' => $orcLootTable->id, 'item_id' => $orcTusk->id],
+            ['chance' => 30.0, 'min_quantity' => 1, 'max_quantity' => 1]
+        );
+
         // 3. Монстры (many-to-many лут-таблицы)
         $rat = \App\Models\Enemy::updateOrCreate(
             ['name' => 'Крыса'],
@@ -279,6 +339,8 @@ class InitialGameDataSeeder extends Seeder
                 'base_experience' => 20,
                 'base_gold' => 5,
                 'scaling_factor' => 0.1,
+                'min_depth' => 1,
+                'max_depth' => 4,
             ]
         );
         $rat->lootTables()->sync([$lootTable->id, $ratLootTable->id]);
@@ -297,6 +359,8 @@ class InitialGameDataSeeder extends Seeder
                 'base_experience' => 25,
                 'base_gold' => 7,
                 'scaling_factor' => 0.1,
+                'min_depth' => 3,
+                'max_depth' => 8,
             ]
         );
         $slime->lootTables()->sync([$lootTable->id]);
@@ -315,8 +379,123 @@ class InitialGameDataSeeder extends Seeder
                 'base_experience' => 50,
                 'base_gold' => 12,
                 'scaling_factor' => 0.15,
+                'min_depth' => 5,
             ]
         );
         $wolf->lootTables()->sync([$lootTable->id]);
+
+        $goblin = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Гоблин'],
+            [
+                'level' => 3,
+                'strength' => 12,
+                'agility' => 15,
+                'constitution' => 10,
+                'intelligence' => 5,
+                'luck' => 8,
+                'min_damage' => 6,
+                'max_damage' => 10,
+                'base_experience' => 100,
+                'base_gold' => 25,
+                'scaling_factor' => 0.18,
+                'min_depth' => 7,
+            ]
+        );
+        $goblin->lootTables()->sync([$lootTable->id, $goblinLootTable->id]);
+
+        $skeleton = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Скелет'],
+            [
+                'level' => 4,
+                'strength' => 15,
+                'agility' => 12,
+                'constitution' => 15,
+                'intelligence' => 2,
+                'luck' => 2,
+                'min_damage' => 10,
+                'max_damage' => 15,
+                'base_experience' => 150,
+                'base_gold' => 30,
+                'scaling_factor' => 0.2,
+                'min_depth' => 10,
+            ]
+        );
+        $skeleton->lootTables()->sync([$lootTable->id, $skeletonLootTable->id]);
+
+        $orc = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Орк'],
+            [
+                'level' => 5,
+                'strength' => 25,
+                'agility' => 10,
+                'constitution' => 30,
+                'intelligence' => 5,
+                'luck' => 5,
+                'min_damage' => 20,
+                'max_damage' => 30,
+                'base_experience' => 300,
+                'base_gold' => 60,
+                'scaling_factor' => 0.25,
+                'min_depth' => 13,
+            ]
+        );
+        $orc->lootTables()->sync([$lootTable->id, $orcLootTable->id]);
+
+        $troll = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Тролль'],
+            [
+                'level' => 7,
+                'strength' => 40,
+                'agility' => 5,
+                'constitution' => 60,
+                'intelligence' => 1,
+                'luck' => 2,
+                'min_damage' => 40,
+                'max_damage' => 60,
+                'base_experience' => 600,
+                'base_gold' => 150,
+                'scaling_factor' => 0.3,
+                'min_depth' => 16,
+            ]
+        );
+        $troll->lootTables()->sync([$lootTable->id]);
+
+        $ghost = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Призрак'],
+            [
+                'level' => 8,
+                'strength' => 5,
+                'agility' => 50,
+                'constitution' => 20,
+                'intelligence' => 50,
+                'luck' => 30,
+                'min_damage' => 30,
+                'max_damage' => 50,
+                'base_experience' => 800,
+                'base_gold' => 200,
+                'scaling_factor' => 0.35,
+                'min_depth' => 20,
+            ]
+        );
+        $ghost->lootTables()->sync([$lootTable->id]);
+
+        $demon = \App\Models\Enemy::updateOrCreate(
+            ['name' => 'Демон'],
+            [
+                'level' => 10,
+                'strength' => 80,
+                'agility' => 60,
+                'constitution' => 100,
+                'intelligence' => 70,
+                'luck' => 40,
+                'min_damage' => 100,
+                'max_damage' => 150,
+                'base_experience' => 2000,
+                'base_gold' => 500,
+                'scaling_factor' => 0.45,
+                'min_depth' => 25,
+            ]
+        );
+        $demon->lootTables()->sync([$lootTable->id]);
     }
 }

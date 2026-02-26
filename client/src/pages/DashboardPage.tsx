@@ -3,14 +3,16 @@ import { useGameStore } from '../store/gameStore';
 import api from '../api/axios';
 import { Navigate, useNavigate } from 'react-router-dom';
 import StatBar from '../components/StatBar';
-import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store } from 'lucide-react';
+import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
+import { goDeeper, startCombat, changeDepth } from '../api/combatApi';
 
 const DashboardPage: React.FC = () => {
     const { currentCharacter, setCurrentCharacter } = useGameStore();
     const navigate = useNavigate();
     const [showDetails, setShowDetails] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const [searching, setSearching] = useState(false);
     const [distributing, setDistributing] = useState<string | null>(null);
 
     useEffect(() => {
@@ -59,7 +61,8 @@ const DashboardPage: React.FC = () => {
 
     const dynamic = char.dynamic_stats || {
         current_hp: stats.max_hp,
-        current_mp: stats.max_mp
+        current_mp: stats.max_mp,
+        enemies_defeated_at_depth: 0
     };
 
     const statPoints = char.stat_points || 0;
@@ -76,6 +79,52 @@ const DashboardPage: React.FC = () => {
             alert(err.response?.data?.message || 'Ошибка распределения очков');
         } finally {
             setDistributing(null);
+        }
+    };
+
+    const handleSearchEnemy = async () => {
+        if (!currentCharacter || searching) return;
+        setSearching(true);
+        try {
+            await startCombat(currentCharacter.id);
+            navigate('/combat');
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Не удалось найти противника');
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const handleGoDeeper = async () => {
+        if (!currentCharacter || dynamic.enemies_defeated_at_depth < 3 || syncing) return;
+        setSyncing(true);
+        try {
+            const response = await goDeeper(currentCharacter.id);
+            if (response.success) {
+                // Синхронизируем данные персонажа
+                const charRes = await api.get(`/characters/${char.id}`);
+                setCurrentCharacter(charRes.data.data);
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Ошибка перехода');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const handleDepthChange = async (newDepth: number) => {
+        if (!currentCharacter || syncing || newDepth < 1 || newDepth > (char.max_dungeon_depth || 1)) return;
+        setSyncing(true);
+        try {
+            const response = await changeDepth(currentCharacter.id, newDepth);
+            if (response.success) {
+                const charRes = await api.get(`/characters/${char.id}`);
+                setCurrentCharacter(charRes.data.data);
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Ошибка смены глубины');
+        } finally {
+            setSyncing(false);
         }
     };
 
@@ -137,6 +186,62 @@ const DashboardPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Dungeon Progression */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-red-950/30 rounded-xl flex items-center justify-center border border-red-900/50">
+                            <Skull className="w-6 h-6 text-red-500" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleDepthChange(char.dungeon_depth - 1)}
+                                    disabled={char.dungeon_depth <= 1 || syncing}
+                                    className="p-1 hover:bg-slate-800 rounded-lg text-slate-500 disabled:opacity-30 transition-colors"
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                </button>
+                                <h4 className="text-lg font-bold text-slate-100 italic tracking-tight">Глубина {char.dungeon_depth}</h4>
+                                <button
+                                    onClick={() => handleDepthChange(char.dungeon_depth + 1)}
+                                    disabled={char.dungeon_depth >= (char.max_dungeon_depth || 1) || syncing}
+                                    className="p-1 hover:bg-slate-800 rounded-lg text-slate-500 disabled:opacity-30 transition-colors"
+                                >
+                                    <ArrowRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Максимальная открытая: {char.max_dungeon_depth || 1}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 max-w-md w-full">
+                        <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase mb-1">
+                            <span>Прогресс уровня</span>
+                            <span>{dynamic.enemies_defeated_at_depth} / 3 побед</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-950 rounded-full border border-slate-800 p-0.5">
+                            <div
+                                className="h-full bg-red-600 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(220,38,38,0.4)]"
+                                style={{ width: `${Math.min(100, (dynamic.enemies_defeated_at_depth / 3) * 100)}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleGoDeeper}
+                        disabled={dynamic.enemies_defeated_at_depth < 3 || syncing}
+                        className={`px-8 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 ${dynamic.enemies_defeated_at_depth >= 3
+                            ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/40 animate-pulse'
+                            : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
+                            }`}
+                    >
+                        {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                        Спуститься глубже
+                    </button>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                 <StatBar
                     label="Здоровье"
@@ -160,15 +265,16 @@ const DashboardPage: React.FC = () => {
                     <h3 className="text-xl font-bold text-slate-300 px-1">Где приключения?</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <button
-                            onClick={() => navigate('/combat')}
+                            onClick={handleSearchEnemy}
+                            disabled={searching}
                             className="group p-8 bg-amber-600 hover:bg-amber-500 rounded-3xl text-left transition-all shadow-xl shadow-amber-900/20 flex items-center gap-6"
                         >
                             <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
-                                <Search className="w-8 h-8 text-white" />
+                                {searching ? <Loader2 className="w-8 h-8 text-white animate-spin" /> : <Search className="w-8 h-8 text-white" />}
                             </div>
                             <div>
                                 <h4 className="text-2xl font-bold text-white mb-1">Искать врага</h4>
-                                <p className="text-amber-100 text-sm opacity-80">Отправиться в лес на охоту</p>
+                                <p className="text-amber-100 text-sm opacity-80">Случайная битва на глубине {char.dungeon_depth}</p>
                             </div>
                         </button>
 

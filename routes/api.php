@@ -20,7 +20,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/combat/{combat}', [\App\Http\Controllers\Api\CombatController::class, 'show']);
     Route::post('/combat/{combat}/attack', [\App\Http\Controllers\Api\CombatController::class, 'attack']);
     Route::post('/combat/{combat}/defense', [\App\Http\Controllers\Api\CombatController::class, 'defense']);
+    Route::post('/combat/{combat}/ability', [\App\Http\Controllers\Api\CombatController::class, 'useAbility']);
+    Route::get('/characters/{character}/abilities', [\App\Http\Controllers\Api\CombatController::class, 'abilities']);
     Route::post('/combat/{combat}/flee', [\App\Http\Controllers\Api\CombatController::class, 'flee']);
+    Route::post('/combat/go-deeper', [\App\Http\Controllers\Api\CombatController::class, 'goDeeper']);
+    Route::post('/combat/change-depth', [\App\Http\Controllers\Api\CombatController::class, 'changeDepth']);
+
+    // Abilities
+    Route::get('/characters/{character}/all-abilities', [\App\Http\Controllers\Api\AbilityController::class, 'index']);
+    Route::post('/characters/{character}/unlock-ability', [\App\Http\Controllers\Api\AbilityController::class, 'unlock']);
 
     // Inventory
     Route::get('/inventory/{character}', [\App\Http\Controllers\Api\InventoryController::class, 'index']);

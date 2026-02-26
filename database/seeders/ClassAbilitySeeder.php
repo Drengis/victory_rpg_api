@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\ClassAbility;
 
@@ -13,46 +12,106 @@ class ClassAbilitySeeder extends Seeder
      */
     public function run(): void
     {
-        // Воин: Блок
-        ClassAbility::updateOrCreate(
-            ['class' => 'воин', 'ability_name' => 'Блок'],
+        $abilities = [
+            // Воин
             [
+                'class' => 'воин',
+                'ability_name' => 'Защитная стойка',
                 'ability_type' => 'defense',
-                'mp_cost' => 15,
+                'mp_cost' => 10,
+                'gold_cost' => 15,
                 'max_uses_per_combat' => null,
-                'cooldown_turns' => 1,
+                'cooldown_turns' => 0,
+                'duration' => 2,
+                'level_required' => 1,
                 'effect_type' => 'temp_armor',
                 'effect_formula' => 'constitution',
-                'description' => 'Воин принимает защитную стойку, увеличивая броню на значение Выносливости на следующий ход.',
-            ]
-        );
-
-        // Лучник: Уклонение
-        ClassAbility::updateOrCreate(
-            ['class' => 'лучник', 'ability_name' => 'Уклонение'],
+                'description' => 'Воин встает в глухую оборону, увеличивая броню на значение Стойкости на 2 хода.',
+            ],
             [
-                'ability_type' => 'defense',
-                'mp_cost' => 15,
+                'class' => 'воин',
+                'ability_name' => 'Мощный удар',
+                'ability_type' => 'attack',
+                'mp_cost' => 18,
+                'gold_cost' => 35,
                 'max_uses_per_combat' => null,
                 'cooldown_turns' => 1,
+                'duration' => 1,
+                'level_required' => 3,
+                'effect_type' => 'deal_damage',
+                'effect_formula' => 'strength * 1.5',
+                'description' => 'Сокрушительный удар, наносящий 150% урона от силы.',
+            ],
+            // Лучник
+            [
+                'class' => 'лучник',
+                'ability_name' => 'Уклонение',
+                'ability_type' => 'defense',
+                'mp_cost' => 8,
+                'gold_cost' => 15,
+                'max_uses_per_combat' => null,
+                'cooldown_turns' => 0,
+                'duration' => 2,
+                'level_required' => 1,
                 'effect_type' => 'temp_evasion',
                 'effect_formula' => 'agility * 0.5',
-                'description' => 'Лучник готовится к уклонению, увеличивая шанс уклонения на 50% от Ловкости на следующий ход.',
-            ]
-        );
-
-        // Маг: Магический Барьер
-        ClassAbility::updateOrCreate(
-            ['class' => 'маг', 'ability_name' => 'Магический Барьер'],
+                'description' => 'Лучник становится крайне подвижным, увеличивая уклонение на 50% от Ловкости на 2 хода.',
+            ],
             [
+                'class' => 'лучник',
+                'ability_name' => 'Точный выстрел',
+                'ability_type' => 'attack',
+                'mp_cost' => 15,
+                'gold_cost' => 35,
+                'max_uses_per_combat' => null,
+                'cooldown_turns' => 2,
+                'duration' => 1,
+                'level_required' => 5,
+                'effect_type' => 'deal_damage',
+                'effect_formula' => 'agility * 2.0',
+                'description' => 'Выстрел из засады, наносящий 200% урона от Ловкости.',
+            ],
+            // Маг
+            [
+                'class' => 'маг',
+                'ability_name' => 'Магический щит',
                 'ability_type' => 'defense',
-                'mp_cost' => 35,
-                'max_uses_per_combat' => 1,
+                'mp_cost' => 15,
+                'gold_cost' => 15,
+                'max_uses_per_combat' => null,
                 'cooldown_turns' => 0,
+                'duration' => 1,
+                'level_required' => 1,
                 'effect_type' => 'barrier',
-                'effect_formula' => 'intelligence * 1.5',
-                'description' => 'Маг создаёт магический щит, поглощающий урон. Стоимость: 30 маны. Можно использовать 1 раз за бой.',
-            ]
-        );
+                'effect_formula' => 'intelligence * 2',
+                'description' => 'Маг создает щит, поглощающий урон в размере интеллекта x2. Щит висит, пока не будет пробит.',
+            ],
+            [
+                'class' => 'маг',
+                'ability_name' => 'Огненный шар',
+                'ability_type' => 'attack',
+                'mp_cost' => 20,
+                'gold_cost' => 35,
+                'max_uses_per_combat' => null,
+                'cooldown_turns' => 1,
+                'duration' => 1,
+                'level_required' => 4,
+                'effect_type' => 'deal_damage',
+                'effect_formula' => 'intelligence * 2.5',
+                'description' => 'Огненный шар, наносящий 250% урона от Интеллекта.',
+            ],
+        ];
+
+        $validAbilityIds = [];
+        foreach ($abilities as $abilityData) {
+            $ability = ClassAbility::updateOrCreate(
+                ['class' => $abilityData['class'], 'ability_name' => $abilityData['ability_name']],
+                $abilityData
+            );
+            $validAbilityIds[] = $ability->id;
+        }
+
+        // Удаляем способности, которых нет в текущем списке сидера
+        ClassAbility::whereNotIn('id', $validAbilityIds)->delete();
     }
 }

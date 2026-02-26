@@ -15,6 +15,20 @@ class EnemyController extends BaseController
         $this->service = $service;
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $query = Enemy::query();
+
+        if ($request->has('dungeon_depth')) {
+            $depth = (int) $request->dungeon_depth;
+            $query->whereBetween('level', [$depth - 1, $depth + 1]);
+        }
+
+        $enemies = $query->get();
+
+        return $this->successResponse($enemies); // Assuming successResponse is available from BaseController
+    }
+
     protected function getService(): EnemyService
     {
         return $this->service;

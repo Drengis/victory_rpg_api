@@ -8,11 +8,14 @@ class ClassAbility extends Model
 {
     protected $fillable = [
         'class',
+        'level_required',
         'ability_name',
         'ability_type',
         'mp_cost',
+        'gold_cost',
         'max_uses_per_combat',
         'cooldown_turns',
+        'duration',
         'effect_type',
         'effect_formula',
         'description',
@@ -20,8 +23,10 @@ class ClassAbility extends Model
 
     protected $casts = [
         'mp_cost' => 'integer',
+        'gold_cost' => 'integer',
         'max_uses_per_combat' => 'integer',
         'cooldown_turns' => 'integer',
+        'duration' => 'integer',
     ];
 
     /**

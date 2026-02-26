@@ -9,6 +9,7 @@ class Enemy extends Model
     protected $fillable = [
         'name',
         'level',
+        'min_depth',
         'strength',
         'agility',
         'constitution',
@@ -19,10 +20,12 @@ class Enemy extends Model
         'max_damage',
         'base_experience',
         'base_gold',
+        'max_depth',
     ];
 
     protected $casts = [
         'level' => 'integer',
+        'min_depth' => 'integer',
         'strength' => 'integer',
         'agility' => 'integer',
         'constitution' => 'integer',
@@ -33,6 +36,7 @@ class Enemy extends Model
         'max_damage' => 'integer',
         'base_experience' => 'integer',
         'base_gold' => 'integer',
+        'max_depth' => 'integer',
     ];
 
     public function lootTables()

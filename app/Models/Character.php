@@ -27,6 +27,8 @@ class Character extends Model
         'constitution_added',
         'intelligence_added',
         'luck_added',
+        'dungeon_depth',
+        'max_dungeon_depth',
     ];
 
     protected $attributes = [
@@ -44,6 +46,8 @@ class Character extends Model
         'constitution_added' => 0,
         'intelligence_added' => 0,
         'luck_added' => 0,
+        'dungeon_depth' => 1,
+        'max_dungeon_depth' => 1,
     ];
 
     protected $casts = [
@@ -51,6 +55,8 @@ class Character extends Model
         'experience' => 'integer',
         'gold' => 'integer',
         'stat_points' => 'integer',
+        'dungeon_depth' => 'integer',
+        'max_dungeon_depth' => 'integer',
     ];
 
     public function stats(): HasOne
@@ -61,6 +67,23 @@ class Character extends Model
     public function dynamicStats(): HasOne
     {
         return $this->hasOne(CharacterDynamicStat::class);
+    }
+
+    /**
+     * Разlocked способности персонажа
+     */
+    public function abilities(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(ClassAbility::class, 'character_abilities', 'character_id', 'ability_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Алиас для фронтенда (snake_case)
+     */
+    public function getDynamicStatsAttribute()
+    {
+        return $this->dynamicStats()->first();
     }
 
     public function items(): HasMany
@@ -87,5 +110,5 @@ class Character extends Model
         return min(100, ($this->experience / $nextXp) * 100);
     }
 
-    protected $appends = ['next_level_xp', 'xp_percentage'];
+    protected $appends = ['next_level_xp', 'xp_percentage', 'dynamic_stats'];
 }

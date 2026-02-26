@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class LootTable extends Model
 {
-    protected $fillable = ['name', 'mode'];
+    protected $fillable = ['name', 'mode', 'chance'];
 
     public function items()
     {

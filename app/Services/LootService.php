@@ -15,9 +15,9 @@ class LootService extends BaseService
 
     /**
      * Сгенерировать лут для убитого монстра
-     * @return array Массив [item_id => quantity]
+     * @return array Список выпавших предметов [['item' => Item, 'quantity' => int, 'ilevel' => int]]
      */
-    public function generateLoot(Enemy $enemy, ?\App\Models\Character $character = null): array
+    public function generateLoot(Enemy $enemy, ?\App\Models\Character $character = null, int $level = 1): array
     {
         $lootTables = $enemy->lootTables;
         if ($lootTables->isEmpty()) {
@@ -25,120 +25,64 @@ class LootService extends BaseService
         }
 
         $luckBonus = $character ? ($character->stats->rare_loot_bonus / 100) : 0;
-        $rolledLoot = [];
+        $allDroppedItems = [];
 
         foreach ($lootTables as $table) {
-            $items = LootItem::where('loot_table_id', $table->id)->get();
+            // Проверка общего шанса таблицы
+            $tableChance = $table->chance ?? 100.0;
+            if (rand(0, 10000) / 100 > $tableChance) {
+                continue;
+            }
+
+            $items = LootItem::where('loot_table_id', $table->id)->with('item')->get();
 
             if ($table->mode === 'one') {
                 // Режим "один предмет": chance используется как вес
                 $totalWeight = $items->sum('chance');
-                $roll = rand(0, (int)($totalWeight * 100)) / 100;
+                if ($totalWeight <= 0) continue;
 
+                $roll = rand(0, (int)($totalWeight * 100)) / 100;
                 $cumulative = 0;
                 foreach ($items as $lootItem) {
-                    $effectiveWeight = $lootItem->chance * (1 + $luckBonus);
-                    $cumulative += $effectiveWeight;
-
+                    $cumulative += $lootItem->chance;
                     if ($roll <= $cumulative) {
-                        $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
-                        if (isset($rolledLoot[$lootItem->item_id])) {
-                            $rolledLoot[$lootItem->item_id] += $quantity;
-                        } else {
-                            $rolledLoot[$lootItem->item_id] = $quantity;
-                        }
+                        $allDroppedItems[] = $this->processLootItem($lootItem, $level);
                         break;
                     }
                 }
             } else {
-                // Режим "each" (по умолчанию): каждый предмет ролится независимо
+                // Режим "each": каждый предмет ролится независимо
                 foreach ($items as $lootItem) {
                     $roll = rand(0, 10000) / 100;
                     $effectiveChance = $lootItem->chance * (1 + $luckBonus);
 
                     if ($roll <= $effectiveChance) {
-                        $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
-                        if (isset($rolledLoot[$lootItem->item_id])) {
-                            $rolledLoot[$lootItem->item_id] += $quantity;
-                        } else {
-                            $rolledLoot[$lootItem->item_id] = $quantity;
-                        }
+                        $allDroppedItems[] = $this->processLootItem($lootItem, $level);
                     }
                 }
             }
         }
 
-        return $rolledLoot;
+        return $allDroppedItems;
     }
 
     /**
-     * Сгенерировать случайную экипировку на основе уровня монстра
+     * Обработка конкретного выпавшего предмета (уровень, количество)
      */
-    public function rollDynamicGear(Enemy $enemy, ?\App\Models\Character $character = null): ?array
+    protected function processLootItem(LootItem $lootItem, int $level): array
     {
-        $luckBonus = 0;
-        if ($character && $character->stats) {
-            $luckBonus = $character->stats->rare_loot_bonus / 100;
+        $item = $lootItem->item;
+        $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
+        $ilevel = 1;
+
+        if ($item->isEquipment()) {
+            // Генерируем iLvl (actual level +/- 2)
+            $ilevel = max(1, $level + rand(-2, 2));
         }
-        
-        // Базовый шанс на выпадение любой шмотки 5%, масштабируется удачей
-        $baseChance = 5 * (1 + $luckBonus);
-        if (rand(1, 100) > $baseChance) {
-            return null;
-        }
-
-        // 1. Определяем редкость (Quality) на основе уровня врага и удачи
-        $quality = 1; // Common
-        $roll = rand(1, 100);
-        
-        // Бонус удачи увеличивает шансы на редкое качество
-        $blueChance = 5 * (1 + $luckBonus);
-        $greenChance25 = 30 * (1 + $luckBonus);
-        $greenChance20 = 20 * (1 + $luckBonus);
-
-        if ($enemy->level >= 25) {
-            if ($roll <= $blueChance) $quality = 3; // Blue
-            elseif ($roll <= $greenChance25) $quality = 2; // Green
-        } elseif ($enemy->level >= 10) {
-            if ($roll <= $greenChance20) $quality = 2; // Green
-        }
-
-        // 2. Определяем слот (Type)
-        $slotRoll = rand(1, 100);
-        $type = 'chest';
-        
-        if ($slotRoll <= 15) $type = 'weapon';           // 15%
-        elseif ($slotRoll <= 25) $type = 'head';         // 10%
-        elseif ($slotRoll <= 40) $type = 'chest';        // 15%
-        elseif ($slotRoll <= 50) $type = 'hands';        // 10%
-        elseif ($slotRoll <= 60) $type = 'legs';         // 10%
-        elseif ($slotRoll <= 70) $type = 'feet';         // 10%
-        elseif ($slotRoll <= 80) $type = 'belt';         // 10%
-        elseif ($slotRoll <= 88) $type = 'neck';         // 8%
-        elseif ($slotRoll <= 96) $type = 'ring';         // 8%
-        else $type = 'trinket';                          // 4%
-
-        // 3. Ищем случайный шаблон предмета
-        $itemTemplate = \App\Models\Item::where('type', $type)
-            ->where('quality', $quality)
-            ->inRandomOrder()
-            ->first();
-
-        if (!$itemTemplate) {
-            // Если не нашли нужного качества, пробуем Common
-            $itemTemplate = \App\Models\Item::where('type', $type)
-                ->where('quality', 1)
-                ->inRandomOrder()
-                ->first();
-        }
-
-        if (!$itemTemplate) return null;
-
-        // 4. Генерируем iLvl (enemy level +/- 2)
-        $ilevel = max(1, $enemy->level + rand(-2, 2));
 
         return [
-            'item_id' => $itemTemplate->id,
+            'item' => $item,
+            'quantity' => $quantity,
             'ilevel' => $ilevel,
         ];
     }

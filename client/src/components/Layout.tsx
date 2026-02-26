@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuthStore } from '../store/authStore';
-import { Shield, LogOut, User as UserIcon, Users } from 'lucide-react';
+import { Shield, LogOut, User as UserIcon, Users, Star, Sword, ShoppingBag, Briefcase } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface LayoutProps {
@@ -22,6 +22,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <nav className="flex items-center gap-6">
                         {isAuthenticated ? (
                             <div className="flex items-center gap-6">
+                                <Link
+                                    to="/dashboard"
+                                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-amber-500 transition-colors"
+                                >
+                                    <Shield className="w-4 h-4" />
+                                    <span>Замок</span>
+                                </Link>
+                                <Link
+                                    to="/abilities"
+                                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-amber-500 transition-colors"
+                                >
+                                    <Star className="w-4 h-4" />
+                                    <span>Навыки</span>
+                                </Link>
+                                <Link
+                                    to="/inventory"
+                                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-amber-500 transition-colors"
+                                >
+                                    <Briefcase className="w-4 h-4" />
+                                    <span>Сумка</span>
+                                </Link>
+                                <Link
+                                    to="/shops"
+                                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-amber-500 transition-colors"
+                                >
+                                    <ShoppingBag className="w-4 h-4" />
+                                    <span>Рынок</span>
+                                </Link>
                                 <Link
                                     to="/characters"
                                     className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-amber-500 transition-colors"

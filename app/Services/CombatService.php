@@ -30,9 +30,9 @@ class CombatService
     /**
      * Начало боя
      */
-    public function startCombat(Character $character, array $enemyIds): Combat
+    public function startCombat(Character $character, array $enemyIds, array $enemyLevels = []): Combat
     {
-        return DB::transaction(function () use ($character, $enemyIds) {
+        return DB::transaction(function () use ($character, $enemyIds, $enemyLevels) {
             // 1. Создаем запись боя
             $firstTurn = rand(1, 100) <= 50 ? 'player' : 'enemies';
             
@@ -46,14 +46,17 @@ class CombatService
             // 2. Добавляем участников (врагов)
             foreach ($enemyIds as $index => $enemyId) {
                 $enemy = Enemy::find($enemyId);
-                $scaledEnemy = $this->enemyService->calculateFinalStats($enemy);
+                $targetLevel = $enemyLevels[$index] ?? $enemy->level;
+                $scaledEnemy = $this->enemyService->calculateFinalStats($enemy, $targetLevel);
 
                 CombatParticipant::create([
                     'combat_id' => $combat->id,
                     'enemy_id' => $enemyId,
                     'current_hp' => $scaledEnemy['max_hp'],
+                    'max_hp' => $scaledEnemy['max_hp'],
                     'current_mp' => $scaledEnemy['max_mp'],
-                    'level' => $enemy->level,
+                    'max_mp' => $scaledEnemy['max_mp'],
+                    'level' => $targetLevel,
                     'position' => $index + 1,
                 ]);
             }
@@ -121,14 +124,14 @@ class CombatService
             $participant->current_hp -= $finalDamage;
             $participant->save();
 
-            $log = "Вы нанесли {$finalDamage} урона противнику {$enemy->name}.";
+            $log = "Вы нанесли {$finalDamage} урона противнику {$enemy->name}. (Шанс попадания: {$hitChance}%, Крит: " . ($stats->crit_chance * 10 / 10) . "%)";
             if ($isCrit) {
                 $log = "✨ КРИТ! " . $log;
             }
             $logs[] = $log;
             
             if ($participant->current_hp <= 0) {
-                $rewards = $this->rewardService->rewardCharacter($character, $enemy);
+                $rewards = $this->rewardService->rewardCharacter($character, $enemy, $participant->level);
                 $participant->delete();
                 
                 // Накапливаем награды в объекте боя
@@ -136,6 +139,7 @@ class CombatService
                 $combat->experience_reward += $rewards['experience'];
                 
                 $currentLoot = $combat->loot_reward ?? [];
+                // Обработка материалов
                 foreach ($rewards['loot'] as $itemId => $qty) {
                     $item = \App\Models\Item::find($itemId);
                     $itemName = $item ? $item->name : "Неизвестный предмет";
@@ -147,10 +151,14 @@ class CombatService
                     }
                 }
                 
-                if (isset($rewards['dynamic_gear'])) {
-                    $item = \App\Models\Item::find($rewards['dynamic_gear']['item_id']);
-                    $itemName = ($item ? $item->name : "Снаряжение") . " (iLvl " . $rewards['dynamic_gear']['ilevel'] . ")";
-                    $currentLoot[$itemName] = 1;
+                // Обработка снаряжения
+                foreach ($rewards['gear'] as $gear) {
+                    $itemName = $gear['name'] . " (iLvl " . $gear['ilevel'] . ")";
+                    if (isset($currentLoot[$itemName])) {
+                        $currentLoot[$itemName] += 1;
+                    } else {
+                        $currentLoot[$itemName] = 1;
+                    }
                 }
                 
                 $combat->loot_reward = $currentLoot;
@@ -177,52 +185,128 @@ class CombatService
     }
 
     /**
-     * Действие: Защита
+     * Действие: Использование способности
      */
-    public function performDefense(Combat $combat): array
+    public function performAbility(Combat $combat, int $abilityId, ?int $targetId = null): array
     {
         if ($combat->current_turn !== 'player') {
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        $abilityLog = DB::transaction(function () use ($combat) {
+        $result = DB::transaction(function () use ($combat, $abilityId, $targetId) {
             $character = $combat->character;
-            $totalStats = (new CharacterService())->calculateFinalStats($character);
-            $class = mb_strtolower($character->class);
-
-            // Получаем способность для класса
-            $ability = $this->abilityService->getAbilityForClass($class, 'defense');
+            $ability = \App\Models\ClassAbility::find($abilityId);
             
             if (!$ability) {
-                throw new \Exception("Защитная способность для класса {$class} не найдена.");
+                throw new \Exception("Способность не найдена.");
             }
 
-            // Проверяем доступность
+            // Проверяем, принадлежит ли способность классу
+            if (mb_strtolower($character->class) !== mb_strtolower($ability->class)) {
+                throw new \Exception("Эта способность недоступна вашему классу.");
+            }
+
+            // Проверяем доступность (уровень, мана, использование)
             $canUse = $this->abilityService->canUseAbility($ability, $combat, $character);
             if (!$canUse['can_use']) {
                 throw new \Exception($canUse['reason']);
             }
 
-            // Используем способность
-            $result = $this->abilityService->useAbility($ability, $combat, $character, $totalStats);
+            $totalStats = $this->characterService->calculateFinalStats($character);
             
-            $log = "🔮 {$result['ability_name']}: эффект +{$result['effect_value']}";
-            if ($result['mp_spent'] > 0) {
-                $log .= " (мана: -{$result['mp_spent']}, осталось: {$result['mp_remaining']})";
+            // Используем способность
+            $useResult = $this->abilityService->useAbility($ability, $combat, $character, $totalStats, $targetId);
+            
+            $logs = [];
+            $emoji = $ability->ability_type === 'defense' ? '🔮' : '💥';
+            $log = "{$emoji} {$useResult['ability_name']}: ";
+            
+            if ($ability->effect_type === 'deal_damage') {
+                $target = $combat->participants()->find($targetId);
+                $enemyName = $target ? $target->enemy->name : "врага";
+                $log .= "нанесено {$useResult['damage_dealt']} урона {$enemyName}";
+                
+                // Проверяем смерть врага
+                if ($target && $target->current_hp <= 0) {
+                    $enemy = $target->enemy;
+                    $rewards = $this->rewardService->rewardCharacter($character, $enemy, $target->level);
+                    $target->delete();
+
+                    // Накапливаем награды в объекте боя
+                    $combat->gold_reward += $rewards['gold'];
+                    $combat->experience_reward += $rewards['experience'];
+                    
+                    $currentLoot = $combat->loot_reward ?? [];
+                    // Обработка материалов
+                    foreach ($rewards['loot'] as $itemId => $qty) {
+                        $item = \App\Models\Item::find($itemId);
+                        $itemName = $item ? $item->name : "Неизвестный предмет";
+                        
+                        if (isset($currentLoot[$itemName])) {
+                            $currentLoot[$itemName] += $qty;
+                        } else {
+                            $currentLoot[$itemName] = $qty;
+                        }
+                    }
+                    
+                    // Обработка снаряжения
+                    foreach ($rewards['gear'] as $gear) {
+                        $itemName = $gear['name'] . " (iLvl " . $gear['ilevel'] . ")";
+                        if (isset($currentLoot[$itemName])) {
+                            $currentLoot[$itemName] += 1;
+                        } else {
+                            $currentLoot[$itemName] = 1;
+                        }
+                    }
+                    
+                    $combat->loot_reward = $currentLoot;
+                    $combat->save();
+
+                    $lootLog = "☠️ Противник {$enemy->name} повержен! Получено опыта: {$rewards['experience']}, золота: {$rewards['gold']}.";
+                    $logs[] = $lootLog;
+                }
+            } else {
+                $log .= "эффект +{$useResult['effect_value']}";
+            }
+
+            if ($useResult['mp_spent'] > 0) {
+                $log .= " (мана: -{$useResult['mp_spent']}, осталось: {$useResult['mp_remaining']})";
             }
             
-            return $log;
+            array_unshift($logs, $log);
+            
+            return $logs;
         });
 
-        // Ход врагов вызываем ПОСЛЕ завершения транзакции
-        $enemyLogs = $this->endPlayerTurn($combat);
-        $logs = array_merge([$abilityLog], $enemyLogs);
+        // Завершение хода игрока, если бой еще идет
+        if ($combat->status === 'active' && $combat->participants()->count() > 0) {
+            $enemyLogs = $this->endPlayerTurn($combat);
+            $result = array_merge($result, $enemyLogs);
+        } elseif ($combat->participants()->count() === 0) {
+            $this->finishCombat($combat, 'won');
+        }
 
         return [
-            'action' => 'defense',
-            'logs' => $logs,
+            'action' => 'ability',
+            'logs' => $result,
             'status' => $combat->status,
         ];
+    }
+
+    /**
+     * Действие: Защита (теперь через общую систему)
+     */
+    public function performDefense(Combat $combat): array
+    {
+        $character = $combat->character;
+        $class = mb_strtolower($character->class);
+        $ability = $this->abilityService->getAbilityForClass($class, 'defense');
+        
+        if (!$ability) {
+            throw new \Exception("Защитная способность для класса {$class} не найдена.");
+        }
+
+        return $this->performAbility($combat, $ability->id);
     }
 
     /**
@@ -341,9 +425,21 @@ class CombatService
             }
         }
 
-        // Сброс временных бонусов (барьер НЕ сбрасывается, он расходуется постепенно)
-        $dynamic->temp_armor = 0;
-        $dynamic->temp_evasion = 0;
+        // Снижение длительности временных эффектов
+        if ($dynamic->temp_armor_duration > 0) {
+            $dynamic->temp_armor_duration--;
+            if ($dynamic->temp_armor_duration === 0) {
+                $dynamic->temp_armor = 0;
+            }
+        }
+
+        if ($dynamic->temp_evasion_duration > 0) {
+            $dynamic->temp_evasion_duration--;
+            if ($dynamic->temp_evasion_duration === 0) {
+                $dynamic->temp_evasion = 0;
+            }
+        }
+
         $dynamic->last_combat_log = implode("\n", $logs);
         $dynamic->save();
 

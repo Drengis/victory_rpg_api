@@ -4,10 +4,11 @@ import { Sword, Shield, Package, Sparkles } from 'lucide-react';
 
 interface ItemCardProps {
     item: Item;
+    ilevel?: number;
     hideActions?: boolean;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, hideActions = false }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, hideActions = false }) => {
     const getQualityColor = (quality: number) => {
         switch (quality) {
             case 2: return 'text-green-500 border-green-500/30 bg-green-500/5';
@@ -38,7 +39,14 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, hideActions = false }) => {
                         {getTypeIcon(item.type)}
                     </div>
                     <div>
-                        <h4 className="font-bold text-slate-100 uppercase tracking-tight leading-tight">{item.name}</h4>
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-100 uppercase tracking-tight leading-tight">{item.name}</h4>
+                            {ilevel && (
+                                <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-mono">
+                                    Lvl {ilevel}
+                                </span>
+                            )}
+                        </div>
                         <span className="text-[10px] font-bold uppercase opacity-60">{item.type}</span>
                     </div>
                 </div>

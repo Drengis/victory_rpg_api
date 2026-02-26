@@ -28,6 +28,8 @@ export interface Character {
     xp_percentage?: number;
     stats?: CharacterStats;
     dynamic_stats?: CharacterDynamicStats;
+    dungeon_depth: number;
+    max_dungeon_depth: number;
     calculated?: any; // Для полных расчетных данных с бэка
 }
 
@@ -94,6 +96,11 @@ export interface CharacterDynamicStats {
     current_mp: number;
     is_in_combat: boolean;
     barrier_hp: number;
+    temp_armor?: number;
+    temp_armor_duration?: number;
+    temp_evasion?: number;
+    temp_evasion_duration?: number;
+    enemies_defeated_at_depth: number;
 }
 
 export interface Enemy {
@@ -123,7 +130,25 @@ export interface CombatParticipant {
     enemy_id: number;
     current_hp: number;
     max_hp?: number;
+    max_mp?: number;
     level: number;
     position: number;
     enemy: Enemy;
+}
+
+export interface ClassAbility {
+    id: number;
+    class: string;
+    level_required: number;
+    ability_name: string;
+    ability_type: 'attack' | 'defense' | 'buff' | 'utility';
+    mp_cost: number;
+    gold_cost: number;
+    max_uses_per_combat: number | null;
+    cooldown_turns: number;
+    duration: number;
+    effect_type: string;
+    effect_formula: string;
+    description: string;
+    is_unlocked?: boolean;
 }

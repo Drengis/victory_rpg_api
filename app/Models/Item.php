@@ -130,6 +130,24 @@ class Item extends Model
     }
 
     /**
+     * Является ли предмет снаряжением
+     */
+    public function isEquipment(): bool
+    {
+        return in_array($this->type, [
+            'weapon', 'head', 'chest', 'hands', 'legs', 'feet', 'neck', 'ring', 'belt', 'trinket'
+        ]);
+    }
+
+    /**
+     * Является ли предмет расходуемым материалом или мусором
+     */
+    public function isMaterial(): bool
+    {
+        return in_array($this->type, ['material', 'junk', 'resource']);
+    }
+
+    /**
      * Добавление display_stats в JSON
      */
     public function toArray()

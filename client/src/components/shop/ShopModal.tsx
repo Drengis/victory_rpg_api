@@ -84,7 +84,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ shop, onClose }) => {
 
                                 return (
                                     <div key={item.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex flex-col gap-4">
-                                        <ItemCard item={item} hideActions />
+                                        <ItemCard item={item} ilevel={item.pivot.ilevel} hideActions />
 
                                         <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-700/50">
                                             <div className="flex items-center gap-1.5 text-amber-500 font-bold">

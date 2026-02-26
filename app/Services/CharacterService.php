@@ -101,10 +101,6 @@ class CharacterService extends BaseService
             }
 
             foreach ($gearStats as $stat => $value) {
-                if ($stat === 'armor') {
-                    $gearStats[$stat] += $item->armor; // Плоское значение пока без iLvl скейла (уточнить?)
-                    continue;
-                }
                 $gearStats[$stat] += $item->getBonus($stat, $charItem->ilevel);
             }
         }

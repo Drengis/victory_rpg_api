@@ -19,78 +19,91 @@ class RewardService
     /**
      * Наградить персонажа за победу над монстром
      */
-    public function rewardCharacter(Character $character, Enemy $enemy): array
+    public function rewardCharacter(Character $character, Enemy $enemy, int $level = 1): array
     {
-        $enemyStats = $this->enemyService->calculateFinalStats($enemy);
+        $enemyStats = $this->enemyService->calculateFinalStats($enemy, $level);
         $luckBonus = ($character->stats->rare_loot_bonus ?? 0) / 100;
         
         $xpReward = round($enemyStats['experience_reward'] * (1 + $luckBonus));
         $goldReward = round($enemyStats['gold_reward'] * (1 + $luckBonus));
         
-        $loot = $this->lootService->generateLoot($enemy, $character);
-        $dynamicGear = $this->lootService->rollDynamicGear($enemy, $character);
+        // Генерируем весь лут (материалы + экипировка) одним вызовом
+        $droppedItems = $this->lootService->generateLoot($enemy, $character, $level);
 
-        DB::transaction(function () use ($character, $xpReward, $goldReward, $loot, $dynamicGear) {
+        DB::transaction(function () use ($character, $xpReward, $goldReward, $droppedItems) {
             // 1. Опыт
             $this->characterService->addExperience($character, $xpReward);
 
             // 2. Золото
             $this->currencyService->addGold($character, $goldReward);
 
-            // 3. Табличный лут (хвосты и прочее)
-            foreach ($loot as $itemId => $quantity) {
-                $item = \App\Models\Item::find($itemId);
-                
-                if ($item && in_array($item->type, ['material', 'junk'])) {
-                    $existing = CharacterItem::where('character_id', $character->id)
-                        ->where('item_id', $itemId)
-                        ->first();
-                        
-                    if ($existing) {
-                        $existing->quantity += $quantity;
-                        $existing->save();
-                        continue;
-                    }
-                }
+            // 3. Прогресс подземелья (только на максимальной доступной глубине)
+            if ($character->dungeon_depth >= $character->max_dungeon_depth) {
+                $dynamic = $character->dynamicStats;
+                $dynamic->increment('enemies_defeated_at_depth');
+            }
 
-                if ($item && !in_array($item->type, ['material', 'junk'])) {
+            // 4. Сохраняем выпавшие предметы
+            foreach ($droppedItems as $lootData) {
+                $item = $lootData['item'];
+                $quantity = $lootData['quantity'];
+                $ilevel = $lootData['ilevel'];
+
+                if ($item->isEquipment()) {
+                    // Экипировка всегда создается как отдельные записи с уникальным iLvl
                     for ($i = 0; $i < $quantity; $i++) {
                         CharacterItem::create([
                             'character_id' => $character->id,
-                            'item_id' => $itemId,
-                            'ilevel' => 1,
+                            'item_id' => $item->id,
+                            'ilevel' => $ilevel,
                             'is_equipped' => false,
                             'quantity' => 1,
                         ]);
                     }
                 } else {
-                    CharacterItem::create([
-                        'character_id' => $character->id,
-                        'item_id' => $itemId,
-                        'ilevel' => 1,
-                        'is_equipped' => false,
-                        'quantity' => $quantity,
-                    ]);
+                    // Материалы и прочее стакаются
+                    $existing = CharacterItem::where('character_id', $character->id)
+                        ->where('item_id', $item->id)
+                        ->first();
+                        
+                    if ($existing) {
+                        $existing->quantity += $quantity;
+                        $existing->save();
+                    } else {
+                        CharacterItem::create([
+                            'character_id' => $character->id,
+                            'item_id' => $item->id,
+                            'ilevel' => 1,
+                            'is_equipped' => false,
+                            'quantity' => $quantity,
+                        ]);
+                    }
                 }
             }
-
-            // 4. Динамическая экипировка
-            if ($dynamicGear) {
-                CharacterItem::create([
-                    'character_id' => $character->id,
-                    'item_id' => $dynamicGear['item_id'],
-                    'ilevel' => $dynamicGear['ilevel'],
-                    'is_equipped' => false,
-                    'quantity' => 1,
-                ]);
-            }
         });
+
+        // Формируем результат для логов (разделяем на материалы и экипировку для читаемости)
+        $lootResult = [];
+        $gearResult = [];
+
+        foreach ($droppedItems as $lootData) {
+            $item = $lootData['item'];
+            if ($item->isEquipment()) {
+                $gearResult[] = [
+                    'item_id' => $item->id,
+                    'name' => $item->name,
+                    'ilevel' => $lootData['ilevel'],
+                ];
+            } else {
+                $lootResult[$item->id] = ($lootResult[$item->id] ?? 0) + $lootData['quantity'];
+            }
+        }
 
         return [
             'experience' => $xpReward,
             'gold' => $goldReward,
-            'loot' => $loot,
-            'dynamic_gear' => $dynamicGear,
+            'loot' => $lootResult,
+            'gear' => $gearResult,
         ];
     }
 }

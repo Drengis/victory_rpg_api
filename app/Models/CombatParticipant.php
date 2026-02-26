@@ -11,6 +11,8 @@ class CombatParticipant extends Model
         'enemy_id',
         'current_hp',
         'current_mp',
+        'max_hp',
+        'max_mp',
         'level',
         'position',
     ];
