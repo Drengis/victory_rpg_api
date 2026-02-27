@@ -14,9 +14,9 @@ trait CalculatesDerivedStats
             'hp_regen' => (float) ($baseStats['constitution'] * 0.5),
             'max_mp' => (int) ($baseStats['intelligence'] * 10),
             'mp_regen' => (float) ($baseStats['intelligence'] * 0.2),
-            'accuracy' => (float) ($baseStats['agility'] * 2),
+            'accuracy' => (float) ($baseStats['agility'] * 1.5),
             'evasion' => (float) ($baseStats['agility'] * 1),
-            'crit_chance' => (float) ($baseStats['luck'] * 0.3),
+            'crit_chance' => (float) ($baseStats['luck'] * 0.8),
             'rare_loot_bonus' => (float) ($baseStats['luck'] * 0.5),
         ];
     }

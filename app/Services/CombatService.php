@@ -111,9 +111,14 @@ class CombatService
             ]);
 
             // 1. Проверка на попадание (Меткость атакующего vs Уклонение защитника)
-            // Базовый шанс попадания 80%. Прибавляем меткость игрока, вычитаем уклонение врага.
-            $hitChance = 80 + $stats->accuracy - ($enemyStats['evasion'] ?? 0);
-            $hitChance = max(5, min(95, $hitChance)); // Шанс попадания от 5% до 95%
+            // Базовый шанс попадания 75%. Прибавляем меткость игрока, вычитаем уклонение врага.
+            $rawHitChance = 75 + $stats->accuracy - ($enemyStats['evasion'] ?? 0);
+            $excessHitChance = max(0, $rawHitChance - 95);
+            $hitChance = min(95, $rawHitChance);
+            $hitChance = max(5, $hitChance); // Шанс попадания от 5% до 95%
+
+            // Бонус к криту от избыточного шанса попадания
+            $critBonus = $excessHitChance / 2;
 
             $logs = [];
             if (rand(1, 100) > $hitChance) {
@@ -131,7 +136,8 @@ class CombatService
 
             // 2. Расчет базового урона
             $baseDamage = rand($stats->min_damage, $stats->max_damage);
-            $isCrit = rand(1, 1000) <= ($stats->crit_chance * 10);
+            $effectiveCritChance = $stats->crit_chance + $critBonus;
+            $isCrit = rand(1, 1000) <= ($effectiveCritChance * 10);
             $critMultiplier = $isCrit ? 2 : 1;
 
             if ($isCrit) {
@@ -147,6 +153,11 @@ class CombatService
                 'enemy' => $enemy->name,
                 'base_damage_range' => $stats->min_damage . '-' . $stats->max_damage,
                 'rolled_damage' => $baseDamage / $critMultiplier,
+                'raw_hit_chance' => $rawHitChance,
+                'excess_hit_chance' => $excessHitChance,
+                'crit_bonus' => $critBonus,
+                'base_crit_chance' => $stats->crit_chance,
+                'effective_crit_chance' => $effectiveCritChance,
                 'crit' => $isCrit,
                 'crit_multiplier' => $critMultiplier,
                 'enemy_armor' => $enemyArmor,
@@ -156,7 +167,7 @@ class CombatService
             $participant->current_hp -= $finalDamage;
             $participant->save();
 
-            $log = "Вы нанесли {$finalDamage} урона противнику {$enemy->name}. (Шанс попадания: {$hitChance}%, Крит: " . ($stats->crit_chance * 10 / 10) . "%)";
+            $log = "Вы нанесли {$finalDamage} урона противнику {$enemy->name}. (Шанс попадания: {$hitChance}%, Бонус крита: +{$critBonus}%, Крит: " . ($effectiveCritChance * 10 / 10) . "%)";
             if ($isCrit) {
                 $log = "✨ КРИТ! " . $log;
             }
@@ -418,8 +429,15 @@ class CombatService
             $enemyAccuracy = $enemyStats['accuracy'] ?? 0;
             $playerEvasion = $charStats->evasion + $dynamic->temp_evasion;
 
-            $hitChance = 80 + $enemyAccuracy - $playerEvasion;
-            $hitChance = max(5, min(95, $hitChance));
+            $rawHitChance = 75 + $enemyAccuracy - $playerEvasion;
+            $excessHitChance = max(0, $rawHitChance - 95);
+            $hitChance = min(95, $rawHitChance);
+            $hitChance = max(5, $hitChance);
+
+            // Бонус к криту от избыточного шанса попадания
+            $critBonus = $excessHitChance / 2;
+            $baseCritChance = ($enemyStats['luck'] * 0.3);
+            $effectiveCritChance = $baseCritChance + $critBonus;
 
             if (rand(1, 100) > $hitChance) {
                 $logs[] = "💨 Враг {$enemy->name} промахнулся (уклонение)!";
@@ -429,10 +447,9 @@ class CombatService
             // 2. Урон + Криты для мобов
             $baseDamage = rand($enemyStats['min_damage'], $enemyStats['max_damage']);
 
-            // Крит моба на основе его удачи
+            // Крит моба на основе удачи + бонус от избыточного попадания
             $critRoll = rand(1, 1000);
-            $critChance = ($enemyStats['luck'] * 0.3) * 10;
-            $isCrit = $critRoll <= $critChance;
+            $isCrit = $critRoll <= ($effectiveCritChance * 10);
             $critMultiplier = $isCrit ? 1.5 : 1;
             if ($isCrit) {
                 $baseDamage *= 1.5; // Криты мобов чуть слабее (1.5x вместо 2x)
@@ -446,8 +463,12 @@ class CombatService
                 'player' => $character->name,
                 'base_damage_range' => $enemyStats['min_damage'] . '-' . $enemyStats['max_damage'],
                 'rolled_damage' => $baseDamage / $critMultiplier,
+                'raw_hit_chance' => $rawHitChance,
+                'excess_hit_chance' => $excessHitChance,
+                'crit_bonus' => $critBonus,
+                'base_crit_chance' => $baseCritChance,
+                'effective_crit_chance' => $effectiveCritChance,
                 'crit' => $isCrit,
-                'crit_chance' => $critChance,
                 'crit_multiplier' => $critMultiplier,
                 'player_armor' => $charStats->armor,
                 'temp_armor' => $dynamic->temp_armor,
@@ -501,13 +522,15 @@ class CombatService
             }
         }
 
-        $dynamic->last_combat_log = implode("\n", $logs);
-        $dynamic->save();
-
         if ($dynamic->current_hp <= 0) {
-            $this->finishCombat($combat, 'lost');
+            $dynamic->current_hp = 1;
             $logs[] = "💀 Вы пали в бою...";
+            $dynamic->last_combat_log = implode("\n", $logs);
+            $dynamic->save();
+            $this->finishCombat($combat, 'lost');
         } else {
+            $dynamic->last_combat_log = implode("\n", $logs);
+            $dynamic->save();
             $combat->increment('turn_number');
             $combat->update(['current_turn' => 'player']);
         }

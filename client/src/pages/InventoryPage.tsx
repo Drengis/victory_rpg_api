@@ -7,28 +7,10 @@ import {
     Package, Sword, Shield, Trash2, ArrowUpCircle,
     Loader2, Coins
 } from 'lucide-react';
-import { sellItem } from '../api/shopApi';
 import ItemCard from '../components/ItemCard';
 
 const InventoryPage: React.FC = () => {
     // ... (внутри компонента)
-    const handleSell = async (itemId: number) => {
-        if (!currentCharacter) return;
-        if (!window.confirm('Вы уверены, что хотите продать этот предмет?')) return;
-
-        setActionLoading(itemId);
-        try {
-            await sellItem(itemId);
-            // Обновляем данные персонажа и инвентарь
-            const charRes = await api.get(`/characters/${currentCharacter.id}`);
-            updateCharacterData(charRes.data.data);
-            await fetchInventory();
-        } catch (err: any) {
-            alert(err.response?.data?.message || 'Ошибка продажи');
-        } finally {
-            setActionLoading(null);
-        }
-    };
     const { currentCharacter, updateCharacterData } = useGameStore();
     const [items, setItems] = useState<CharacterItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -140,9 +122,19 @@ const InventoryPage: React.FC = () => {
                                 const item = getEquippedInSlot(slot.id);
                                 return (
                                     <div key={slot.id} className="group relative">
-                                        <div className={`p-4 rounded-2xl border-2 transition-all flex items-start gap-4 ${item ? 'bg-slate-800 border-amber-500/50 shadow-lg shadow-amber-900/10' : 'bg-slate-950/50 border-dashed border-slate-800'
+                                        <div className={`p-4 rounded-2xl border-2 transition-all flex items-start gap-4 ${!item ? 'bg-slate-950/50 border-dashed border-slate-800' :
+                                            item.quality === 5 ? 'bg-orange-900/10 border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-orange-500/30' :
+                                                item.quality === 4 ? 'bg-purple-900/10 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/30' :
+                                                    item.quality === 3 ? 'bg-blue-900/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/30' :
+                                                        item.quality === 2 ? 'bg-green-900/10 border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.15)] ring-1 ring-green-500/30' :
+                                                            'bg-slate-800 border-amber-500/50 shadow-lg shadow-amber-900/10 ring-1 ring-amber-500/30'
                                             }`}>
-                                            <div className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${item ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-900 text-slate-700'
+                                            <div className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${!item ? 'bg-slate-900 text-slate-700' :
+                                                item.quality === 5 ? 'bg-orange-900/30 text-orange-500' :
+                                                    item.quality === 4 ? 'bg-purple-900/30 text-purple-500' :
+                                                        item.quality === 3 ? 'bg-blue-900/30 text-blue-500' :
+                                                            item.quality === 2 ? 'bg-green-900/30 text-green-500' :
+                                                                'bg-amber-500/10 text-amber-500'
                                                 }`}>
                                                 {slot.icon}
                                             </div>
@@ -158,16 +150,15 @@ const InventoryPage: React.FC = () => {
                                                                 Lvl {item.ilevel}
                                                             </span>
                                                             {item.quality && item.quality > 1 && (
-                                                                <span className={`text-[9px] px-1 rounded font-bold border ${
-                                                                    item.quality === 2 ? 'bg-green-900/30 border-green-600 text-green-400' :
+                                                                <span className={`text-[9px] px-1 rounded font-bold border ${item.quality === 2 ? 'bg-green-900/30 border-green-600 text-green-400' :
                                                                     item.quality === 3 ? 'bg-blue-900/30 border-blue-600 text-blue-400' :
-                                                                    item.quality === 4 ? 'bg-purple-900/30 border-purple-600 text-purple-400' :
-                                                                    'bg-orange-900/30 border-orange-600 text-orange-400'
-                                                                }`}>
+                                                                        item.quality === 4 ? 'bg-purple-900/30 border-purple-600 text-purple-400' :
+                                                                            'bg-orange-900/30 border-orange-600 text-orange-400'
+                                                                    }`}>
                                                                     {item.quality === 2 ? 'Необычный' :
-                                                                     item.quality === 3 ? 'Редкий' :
-                                                                     item.quality === 4 ? 'Эпический' :
-                                                                     item.quality === 5 ? 'Легендарный' : ''}
+                                                                        item.quality === 3 ? 'Редкий' :
+                                                                            item.quality === 4 ? 'Эпический' :
+                                                                                item.quality === 5 ? 'Легендарный' : ''}
                                                                 </span>
                                                             )}
                                                         </>
@@ -229,40 +220,67 @@ const InventoryPage: React.FC = () => {
 
                                     return (
                                         <div key={item.id} className="relative group">
-                                            <ItemCard 
-                                                item={item.item} 
+                                            <ItemCard
+                                                item={item.item}
                                                 ilevel={item.ilevel}
                                                 quality={item.quality ?? undefined}
                                                 playerClass={currentCharacter?.class}
+                                                isEquipped={item.is_equipped}
                                                 hideActions
                                             />
-                                            
-                                            {/* Action Overlay */}
-                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-slate-900/95 rounded-b-xl flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-slate-900/95 rounded-b-xl flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-col">
                                                 {['material', 'junk'].includes(item.item.type) ? (
                                                     <p className="text-[10px] text-slate-500 w-full text-center">Используется для крафта</p>
                                                 ) : (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleEquip(item.id, item.item.type)}
-                                                            disabled={!canEquip || actionLoading !== null}
-                                                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${canEquip
-                                                                ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                                                                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                    <button
+                                                        onClick={() => handleEquip(item.id, item.item.type)}
+                                                        disabled={!canEquip || actionLoading !== null}
+                                                        className={`w-full py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${canEquip
+                                                            ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                                                            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                                                             }`}
-                                                        >
-                                                            {actionLoading === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Надеть'}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleSell(item.id)}
-                                                            disabled={actionLoading !== null}
-                                                            className="flex-1 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1"
-                                                        >
-                                                            <Coins className="w-3 h-3" />
-                                                            Продать
-                                                        </button>
-                                                    </>
+                                                    >
+                                                        {actionLoading === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Надеть'}
+                                                    </button>
                                                 )}
+
+                                                <button
+                                                    onClick={() => {
+                                                        const qtyStr = ['material', 'junk'].includes(item.item.type)
+                                                            ? window.prompt(`Сколько продать? Максимум: ${item.quantity}`, "1")
+                                                            : "1";
+
+                                                        if (qtyStr === null) return;
+
+                                                        const qty = parseInt(qtyStr, 10);
+                                                        if (isNaN(qty) || qty < 1 || qty > item.quantity) {
+                                                            alert("Некорректное количество");
+                                                            return;
+                                                        }
+
+                                                        if (!window.confirm(`Вы уверены, что хотите продать ${qty} шт. за золото?`)) return;
+
+                                                        setActionLoading(item.id);
+                                                        api.post('/inventory/sell', {
+                                                            character_item_id: item.id,
+                                                            quantity: qty
+                                                        }).then(async () => {
+                                                            const charRes = await api.get(`/characters/${currentCharacter.id}`);
+                                                            updateCharacterData(charRes.data.data);
+                                                            fetchInventory();
+                                                        }).catch((err: any) => {
+                                                            alert(err.response?.data?.message || 'Ошибка продажи');
+                                                        }).finally(() => {
+                                                            setActionLoading(null);
+                                                        });
+                                                    }}
+                                                    disabled={actionLoading !== null}
+                                                    className="w-full py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1"
+                                                >
+                                                    <Coins className="w-3 h-3" />
+                                                    Продать
+                                                </button>
                                             </div>
                                         </div>
                                     );

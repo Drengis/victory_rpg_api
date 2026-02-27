@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Item } from '../types/game';
-import { Sword, Shield, Package, Sparkles, XOctagon, Lock } from 'lucide-react';
+import { Sword, Shield, Package, Sparkles, XOctagon, Lock, Coins } from 'lucide-react';
 
 interface ItemCardProps {
     item: Item;
@@ -8,6 +8,7 @@ interface ItemCardProps {
     quality?: number;
     hideActions?: boolean;
     playerClass?: string;
+    isEquipped?: boolean; // Добавлено свойство для подсветки экипированных вещей
 }
 
 const qualityNames: Record<number, string> = {
@@ -18,12 +19,17 @@ const qualityNames: Record<number, string> = {
     5: 'Легендарный',
 };
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions = false, playerClass }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions = false, playerClass, isEquipped = false }) => {
     const effectiveQuality = quality ?? item.quality;
     const isWrongClass = item.required_class && playerClass && item.required_class.toLowerCase() !== playerClass.toLowerCase();
 
     const getCardStyles = (q: number) => {
-        const base = "p-4 rounded-xl border-2 transition-all flex flex-col gap-3 relative overflow-hidden";
+        let base = "p-4 rounded-xl border-2 transition-all flex flex-col gap-3 relative overflow-hidden";
+
+        // Зеленая обводка для экипированного предмета (приоритет над остальным, если это не wrongClass)
+        if (isEquipped && !isWrongClass) {
+            base += " ring-2 ring-amber-500 ring-offset-2 ring-offset-slate-900";
+        }
 
         // КРАСНАЯ ОБВОДКА для неподходящего класса
         if (isWrongClass) {
@@ -79,27 +85,34 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions 
                                 )}
 
                                 {effectiveQuality > 1 && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${
-                                        effectiveQuality === 2 ? 'bg-green-900/50 border-green-500 text-green-400' :
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${effectiveQuality === 2 ? 'bg-green-900/50 border-green-500 text-green-400' :
                                         effectiveQuality === 3 ? 'bg-blue-900/50 border-blue-500 text-blue-400' :
-                                        effectiveQuality === 4 ? 'bg-purple-900/50 border-purple-500 text-purple-400' :
-                                        'bg-orange-900/50 border-orange-500 text-orange-400'
-                                    }`}>
+                                            effectiveQuality === 4 ? 'bg-purple-900/50 border-purple-500 text-purple-400' :
+                                                'bg-orange-900/50 border-orange-500 text-orange-400'
+                                        }`}>
                                         {qualityNames[effectiveQuality] || 'Обычный'}
                                     </span>
                                 )}
 
                                 {item.required_class && (
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase border ${isWrongClass
-                                            ? 'bg-red-600 border-red-400 text-white'
-                                            : 'bg-slate-800 border-slate-600 text-slate-400'
+                                        ? 'bg-red-600 border-red-400 text-white'
+                                        : 'bg-slate-800 border-slate-600 text-slate-400'
                                         }`}>
                                         {item.required_class}
                                     </span>
                                 )}
                             </div>
                         </div>
-                        <span className="text-[10px] font-bold uppercase opacity-50">{item.type}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase opacity-50">{item.type}</span>
+                            {item.base_price > 0 && (
+                                <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                                    <Coins className="w-3 h-3" />
+                                    {Math.floor(item.base_price * 0.5)}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,8 +146,8 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions 
                     <button
                         disabled={!!isWrongClass}
                         className={`w-full py-2 rounded-lg text-[11px] font-black uppercase transition-all ${isWrongClass
-                                ? 'bg-red-950/20 text-red-900 border border-red-900/50 cursor-not-allowed opacity-50'
-                                : 'bg-slate-100 text-slate-900 hover:bg-white active:scale-95'
+                            ? 'bg-red-950/20 text-red-900 border border-red-900/50 cursor-not-allowed opacity-50'
+                            : 'bg-slate-100 text-slate-900 hover:bg-white active:scale-95'
                             }`}
                     >
                         {isWrongClass ? 'Заблокировано' : 'Экипировать'}

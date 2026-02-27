@@ -225,7 +225,21 @@ const CombatPage: React.FC = () => {
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
                                         <Flame className="w-3 h-3" /> Крит
                                     </div>
-                                    <div className="text-red-500">{(playerStats?.crit_chance || 0).toFixed(1)}%</div>
+                                    <div className="text-red-500">
+                                        {(() => {
+                                            const baseCrit = playerStats?.crit_chance || 0;
+                                            const rawHit = 75 + (playerStats?.accuracy || 0) - ((activeEnemy as any)?.enemy_stats?.evasion || 0);
+                                            const excess = Math.max(0, rawHit - 95);
+                                            const critBonus = excess / 2;
+                                            const effectiveCrit = baseCrit + critBonus;
+                                            return (
+                                                <span>
+                                                    {effectiveCrit.toFixed(1)}%
+                                                    {critBonus > 0 && <span className="text-green-400 text-[8px]"> (+{critBonus.toFixed(1)}%)</span>}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
@@ -238,11 +252,19 @@ const CombatPage: React.FC = () => {
                             <div className="flex gap-2 pt-2 border-t border-slate-800">
                                 <div className="flex-1 px-2 py-1 bg-slate-800/30 rounded-lg">
                                     <div className="text-[8px] text-slate-500 mb-0.5">Ваш шанс попадания</div>
-                                    <div className="text-amber-500">{Math.max(5, Math.min(95, 80 + (playerStats?.accuracy || 0) - ((activeEnemy as any)?.enemy_stats?.evasion || 0))).toFixed(0)}%</div>
+                                    {(() => {
+                                        const rawHit = 75 + (playerStats?.accuracy || 0) - ((activeEnemy as any)?.enemy_stats?.evasion || 0);
+                                        const hitChance = Math.max(5, Math.min(95, rawHit));
+                                        return <div className="text-amber-500">{hitChance.toFixed(0)}%</div>;
+                                    })()}
                                 </div>
                                 <div className="flex-1 px-2 py-1 bg-slate-800/30 rounded-lg">
                                     <div className="text-[8px] text-slate-500 mb-0.5">Враг попадает в вас</div>
-                                    <div className="text-red-400">{Math.max(5, Math.min(95, 80 + ((activeEnemy as any)?.enemy_stats?.accuracy || 0) - (playerStats?.evasion || 0))).toFixed(0)}%</div>
+                                    {(() => {
+                                        const rawHit = 75 + ((activeEnemy as any)?.enemy_stats?.accuracy || 0) - (playerStats?.evasion || 0);
+                                        const hitChance = Math.max(5, Math.min(95, rawHit));
+                                        return <div className="text-red-400">{hitChance.toFixed(0)}%</div>;
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -364,7 +386,22 @@ const CombatPage: React.FC = () => {
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
                                         <Flame className="w-3 h-3" /> Крит
                                     </div>
-                                    <div className="text-red-500">{((activeEnemy as any).enemy_stats?.crit_chance || 0).toFixed(1)}%</div>
+                                    <div className="text-red-500">
+                                        {(() => {
+                                            const enemyStats = (activeEnemy as any).enemy_stats;
+                                            const baseCrit = (enemyStats?.luck || 0) * 0.3;
+                                            const rawHit = 75 + (enemyStats?.accuracy || 0) - (playerStats?.evasion || 0);
+                                            const excess = Math.max(0, rawHit - 95);
+                                            const critBonus = excess / 2;
+                                            const effectiveCrit = baseCrit + critBonus;
+                                            return (
+                                                <span>
+                                                    {effectiveCrit.toFixed(1)}%
+                                                    {critBonus > 0 && <span className="text-green-400 text-[8px]"> (+{critBonus.toFixed(1)}%)</span>}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
