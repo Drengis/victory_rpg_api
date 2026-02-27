@@ -147,12 +147,24 @@ class CharacterService extends BaseService
             $baseMin = $weapon->getBonus('min_damage', $ilevel);
             $baseMax = $weapon->getBonus('max_damage', $ilevel);
 
-            $stats['min_damage'] = round($baseMin * (1 + $stats['physical_damage_bonus'] / 100));
-            $stats['max_damage'] = round($baseMax * (1 + $stats['physical_damage_bonus'] / 100));
+            // Для мага используем magical_damage_bonus, для остальных physical_damage_bonus
+            $class = mb_strtolower($character->class);
+            $damageBonus = ($class === 'маг') ? $stats['magical_damage_bonus'] : $stats['physical_damage_bonus'];
+            
+            $stats['min_damage'] = round($baseMin * (1 + $damageBonus / 100));
+            $stats['max_damage'] = round($baseMax * (1 + $damageBonus / 100));
         } else {
             // Значения по умолчанию для урона (если нет оружия)
-            $stats['min_damage'] = 3;
-            $stats['max_damage'] = 7;
+            // Для мага - урон от интеллекта, для остальных - базовый
+            $class = mb_strtolower($character->class);
+            if ($class === 'маг') {
+                $intBonus = ($modifiedStats['intelligence'] ?? 1) * 2;
+                $stats['min_damage'] = 2 + $intBonus;
+                $stats['max_damage'] = 5 + $intBonus;
+            } else {
+                $stats['min_damage'] = 3;
+                $stats['max_damage'] = 7;
+            }
         }
 
         $stats['armor'] = ($gearStats['armor'] ?? 0) + ($stats['armor'] ?? 0);

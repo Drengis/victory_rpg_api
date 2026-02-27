@@ -94,8 +94,11 @@ class CombatService
 
             \Illuminate\Support\Facades\Log::debug('PLAYER_STATS_DEBUG', [
                 'character' => $character->name,
+                'class' => $character->class,
                 'min_damage' => $stats->min_damage,
                 'max_damage' => $stats->max_damage,
+                'physical_damage_bonus' => $stats->physical_damage_bonus,
+                'magical_damage_bonus' => $stats->magical_damage_bonus,
                 'crit_chance' => $stats->crit_chance,
                 'armor' => $stats->armor,
                 'accuracy' => $stats->accuracy,

@@ -207,7 +207,14 @@ const CombatPage: React.FC = () => {
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
                                         <Shield className="w-3 h-3" /> Броня
                                     </div>
-                                    <div className="text-slate-200">{playerStats?.armor || 0}</div>
+                                    <div className="text-slate-200">
+                                        {playerStats?.armor || 0}
+                                        {(playerDynamic?.temp_armor || 0) > 0 && (
+                                            <span className="text-green-400 text-[8px] ml-1">
+                                                [+{playerDynamic.temp_armor} ({playerDynamic.temp_armor_duration}ход)]
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
@@ -219,7 +226,14 @@ const CombatPage: React.FC = () => {
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
                                         <Sparkles className="w-3 h-3" /> Уклонение
                                     </div>
-                                    <div className="text-green-500">+{(playerStats?.evasion || 0).toFixed(0)}%</div>
+                                    <div className="text-green-500">
+                                        +{(playerStats?.evasion || 0).toFixed(0)}%
+                                        {(playerDynamic?.temp_evasion || 0) > 0 && (
+                                            <span className="text-green-400 text-[8px] ml-1">
+                                                [+{playerDynamic.temp_evasion} ({playerDynamic.temp_evasion_duration}ход)]
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
@@ -247,6 +261,16 @@ const CombatPage: React.FC = () => {
                                     </div>
                                     <div className="text-red-400">+{(playerStats?.hp_regen || 0).toFixed(1)}/ход</div>
                                 </div>
+                                {(playerDynamic?.barrier_hp || 0) > 0 && (
+                                    <div className="px-2 py-1 bg-purple-900/30 border border-purple-500/30 rounded-lg col-span-2">
+                                        <div className="flex items-center gap-1 text-purple-400 mb-1">
+                                            🛡️ Барьер
+                                        </div>
+                                        <div className="text-purple-300">
+                                            {playerDynamic.barrier_hp} HP
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             {/* Hit chances */}
                             <div className="flex gap-2 pt-2 border-t border-slate-800">
