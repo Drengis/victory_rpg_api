@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import api from '../api/axios';
 import { Navigate, useNavigate } from 'react-router-dom';
 import StatBar from '../components/StatBar';
-import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft, Star } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 import { goDeeper, startCombat, changeDepth } from '../api/combatApi';
 
@@ -301,6 +301,19 @@ const DashboardPage: React.FC = () => {
                             <div>
                                 <h4 className="text-2xl font-bold text-slate-100 mb-1">Магазин</h4>
                                 <p className="text-slate-500 text-sm">Торговые лавки города</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/abilities')}
+                            className="group p-8 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl text-left transition-all flex items-center gap-6"
+                        >
+                            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center group-hover:bg-slate-700 transition-colors">
+                                <Star className="w-8 h-8 text-slate-400 group-hover:text-amber-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-2xl font-bold text-slate-100 mb-1">Навыки</h4>
+                                <p className="text-slate-500 text-sm">Способности класса</p>
                             </div>
                         </button>
                     </div>

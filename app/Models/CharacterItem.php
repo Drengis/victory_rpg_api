@@ -11,6 +11,7 @@ class CharacterItem extends Model
         'character_id',
         'item_id',
         'ilevel',
+        'quality',
         'slot',
         'is_equipped',
         'quantity',
@@ -19,6 +20,7 @@ class CharacterItem extends Model
     protected $casts = [
         'is_equipped' => 'boolean',
         'ilevel' => 'integer',
+        'quality' => 'integer',
         'quantity' => 'integer',
     ];
 
@@ -39,7 +41,7 @@ class CharacterItem extends Model
     {
         $array = parent::toArray();
         if ($this->relationLoaded('item') && $this->item) {
-            $array['item']['display_stats'] = $this->item->getBonusesList($this->ilevel);
+            $array['item']['display_stats'] = $this->item->getBonusesList($this->ilevel, $this->quality);
         }
         return $array;
     }

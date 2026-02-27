@@ -155,7 +155,7 @@ class CharacterService extends BaseService
             $stats['max_damage'] = 7;
         }
 
-        $stats['armor'] = $gearStats['armor'];
+        $stats['armor'] = ($gearStats['armor'] ?? 0) + ($stats['armor'] ?? 0);
 
         return array_merge($modifiedStats, $stats);
     }

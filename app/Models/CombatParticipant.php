@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Services\EnemyService;
 
 class CombatParticipant extends Model
 {
@@ -17,6 +18,8 @@ class CombatParticipant extends Model
         'position',
     ];
 
+    protected $appends = ['enemy_stats'];
+
     public function combat(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Combat::class);
@@ -25,5 +28,15 @@ class CombatParticipant extends Model
     public function enemy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Enemy::class);
+    }
+
+    public function getEnemyStatsAttribute(): array
+    {
+        if (!$this->enemy) {
+            return [];
+        }
+
+        $enemyService = app(EnemyService::class);
+        return $enemyService->calculateFinalStats($this->enemy, $this->level);
     }
 }

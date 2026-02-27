@@ -36,7 +36,7 @@ class ShopService
 
         return DB::transaction(function () use ($character, $charItem, $quantity) {
             $item = $charItem->item;
-            
+
             // Расчет цены продажи (например, 50% от расчетной цены)
             $itemValue = $item->calculatePrice($charItem->ilevel);
             $sellPricePerUnit = (int) floor($itemValue * 0.5);
@@ -84,7 +84,7 @@ class ShopService
     public function buyItem(Character $character, \App\Models\Shop $shop, \App\Models\Item $item, int $quantity = 1): array
     {
         $shopItem = $shop->items()->where('item_id', $item->id)->first();
-        
+
         if (!$shopItem) {
             throw new Exception("Этот товар не продается в данном магазине.");
         }
@@ -128,6 +128,7 @@ class ShopService
                         'item_id' => $item->id,
                         'ilevel' => $ilevel,
                         'quantity' => 1,
+                        'quality' => 1,
                         'is_equipped' => false,
                     ]);
                 }

@@ -56,6 +56,7 @@ class RewardService
                             'character_id' => $character->id,
                             'item_id' => $item->id,
                             'ilevel' => $ilevel,
+                            'quality' => $lootData['quality'] ?? $item->quality,
                             'is_equipped' => false,
                             'quantity' => 1,
                         ]);
@@ -74,6 +75,7 @@ class RewardService
                             'character_id' => $character->id,
                             'item_id' => $item->id,
                             'ilevel' => 1,
+                            'quality' => $lootData['quality'] ?? $item->quality,
                             'is_equipped' => false,
                             'quantity' => $quantity,
                         ]);
@@ -93,6 +95,7 @@ class RewardService
                     'item_id' => $item->id,
                     'name' => $item->name,
                     'ilevel' => $lootData['ilevel'],
+                    'quality' => $lootData['quality'] ?? $item->quality,
                 ];
             } else {
                 $lootResult[$item->id] = ($lootResult[$item->id] ?? 0) + $lootData['quantity'];

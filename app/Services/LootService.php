@@ -46,7 +46,7 @@ class LootService extends BaseService
                 foreach ($items as $lootItem) {
                     $cumulative += $lootItem->chance;
                     if ($roll <= $cumulative) {
-                        $allDroppedItems[] = $this->processLootItem($lootItem, $level);
+                        $allDroppedItems[] = $this->processLootItem($lootItem, $level, $character);
                         break;
                     }
                 }
@@ -57,7 +57,7 @@ class LootService extends BaseService
                     $effectiveChance = $lootItem->chance * (1 + $luckBonus);
 
                     if ($roll <= $effectiveChance) {
-                        $allDroppedItems[] = $this->processLootItem($lootItem, $level);
+                        $allDroppedItems[] = $this->processLootItem($lootItem, $level, $character);
                     }
                 }
             }
@@ -67,23 +67,49 @@ class LootService extends BaseService
     }
 
     /**
-     * Обработка конкретного выпавшего предмета (уровень, количество)
+     * Обработка конкретного выпавшего предмета (уровень, количество, редкость)
      */
-    protected function processLootItem(LootItem $lootItem, int $level): array
+    protected function processLootItem(LootItem $lootItem, int $level, ?\App\Models\Character $character = null): array
     {
         $item = $lootItem->item;
         $quantity = rand($lootItem->min_quantity, $lootItem->max_quantity);
         $ilevel = 1;
+        $quality = $item->quality;
 
         if ($item->isEquipment()) {
             // Генерируем iLvl (actual level +/- 2)
             $ilevel = max(1, $level + rand(-2, 2));
+
+            // Логика динамической редкости
+            $depth = $character ? $character->dungeon_depth : 1;
+            $luckBonus = $character ? ($character->stats->rare_loot_bonus / 100) : 0;
+            
+            $newQuality = $quality;
+            
+            // Шанс на Uncommon (Зеленый) с 5 этажа
+            if ($newQuality < \App\Models\Item::QUALITY_UNCOMMON && $depth >= 5) {
+                $chance = min(50.0, ($depth / 5) * 10.0) * (1 + $luckBonus);
+                if (rand(0, 10000) / 100 <= $chance) {
+                    $newQuality = \App\Models\Item::QUALITY_UNCOMMON;
+                }
+            }
+
+            // Шанс на Rare (Синий) с 12 этажа
+            if ($newQuality < \App\Models\Item::QUALITY_RARE && $depth >= 12) {
+                $chance = min(25.0, (($depth - 7) / 5) * 10.0) * (1 + $luckBonus);
+                if (rand(0, 10000) / 100 <= $chance) {
+                    $newQuality = \App\Models\Item::QUALITY_RARE;
+                }
+            }
+            
+            $quality = $newQuality;
         }
 
         return [
             'item' => $item,
             'quantity' => $quantity,
             'ilevel' => $ilevel,
+            'quality' => $quality,
         ];
     }
 }

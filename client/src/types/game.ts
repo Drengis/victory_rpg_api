@@ -38,6 +38,7 @@ export interface Item {
     name: string;
     description?: string;
     type: 'weapon' | 'head' | 'chest' | 'hands' | 'legs' | 'feet' | 'neck' | 'ring' | 'belt' | 'trinket' | 'material' | 'junk' | 'consumable';
+    required_class?: string;
     quality: number;
     base_price: number;
     min_damage?: number;
@@ -70,6 +71,7 @@ export interface CharacterItem {
     character_id: number;
     item_id: number;
     ilevel: number;
+    quality: number | null;
     slot: string | null;
     is_equipped: boolean;
     quantity: number;

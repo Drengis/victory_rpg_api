@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import type { Combat, ClassAbility } from '../types/game';
 import StatBar from '../components/StatBar';
-import { Sword, Shield, Heart, Droplets, Loader2, Skull, ScrollText, Timer, Star, Flame, Zap } from 'lucide-react';
+import { Sword, Shield, Heart, Droplets, Loader2, Skull, ScrollText, Timer, Star, Flame, Zap, Target, Sparkles } from 'lucide-react';
 import { getAllAbilities, useAbility as useAbilityApi } from '../api/combatApi';
 
 const CombatPage: React.FC = () => {
@@ -192,26 +192,57 @@ const CombatPage: React.FC = () => {
                             Сбежать
                         </button>
 
-                        {/* Battle Stats Display */}
-                        <div className="bg-slate-900/40 border border-slate-800 p-3 rounded-2xl grid grid-cols-2 gap-2 text-[10px] font-bold uppercase tracking-tighter">
-                            <div className="flex flex-col gap-1 px-2 py-1 bg-slate-800/50 rounded-lg">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Попадание</span>
-                                    <span className="text-amber-500">
-                                        {Math.max(5, Math.min(95, 85 + (playerStats?.accuracy || 0) - ((activeEnemy?.level || 1) * 0.5))).toFixed(0)}%
-                                    </span>
+                        {/* Battle Stats Display - Player */}
+                        <div className="bg-slate-900/40 border border-slate-800 p-3 rounded-2xl space-y-2 text-[10px] font-bold uppercase tracking-tighter">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Sword className="w-3 h-3" /> Урон
+                                    </div>
+                                    <div className="text-slate-200">
+                                        {playerStats?.min_damage || 1} - {playerStats?.max_damage || 2}
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-[8px] opacity-70">
-                                    <span className="text-slate-500">Врага по вам</span>
-                                    <span className="text-red-400">
-                                        {Math.max(5, Math.min(95, 85 + ((activeEnemy?.level || 1) * 0.5) - (playerStats?.evasion || 0))).toFixed(0)}%
-                                    </span>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Shield className="w-3 h-3" /> Броня
+                                    </div>
+                                    <div className="text-slate-200">{playerStats?.armor || 0}</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Target className="w-3 h-3" /> Меткость
+                                    </div>
+                                    <div className="text-amber-500">+{(playerStats?.accuracy || 0).toFixed(0)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Sparkles className="w-3 h-3" /> Уклонение
+                                    </div>
+                                    <div className="text-green-500">+{(playerStats?.evasion || 0).toFixed(0)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Flame className="w-3 h-3" /> Крит
+                                    </div>
+                                    <div className="text-red-500">{(playerStats?.crit_chance || 0).toFixed(1)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Heart className="w-3 h-3" /> Реген HP
+                                    </div>
+                                    <div className="text-red-400">+{(playerStats?.hp_regen || 0).toFixed(1)}/ход</div>
                                 </div>
                             </div>
-                            <div className="flex flex-col justify-center px-2 py-1 bg-slate-800/50 rounded-lg">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Шанс крита</span>
-                                    <span className="text-red-500">{(playerStats?.crit_chance || 0).toFixed(1)}%</span>
+                            {/* Hit chances */}
+                            <div className="flex gap-2 pt-2 border-t border-slate-800">
+                                <div className="flex-1 px-2 py-1 bg-slate-800/30 rounded-lg">
+                                    <div className="text-[8px] text-slate-500 mb-0.5">Ваш шанс попадания</div>
+                                    <div className="text-amber-500">{Math.max(5, Math.min(95, 80 + (playerStats?.accuracy || 0) - ((activeEnemy as any)?.enemy_stats?.evasion || 0))).toFixed(0)}%</div>
+                                </div>
+                                <div className="flex-1 px-2 py-1 bg-slate-800/30 rounded-lg">
+                                    <div className="text-[8px] text-slate-500 mb-0.5">Враг попадает в вас</div>
+                                    <div className="text-red-400">{Math.max(5, Math.min(95, 80 + ((activeEnemy as any)?.enemy_stats?.accuracy || 0) - (playerStats?.evasion || 0))).toFixed(0)}%</div>
                                 </div>
                             </div>
                         </div>
@@ -296,8 +327,52 @@ const CombatPage: React.FC = () => {
                             </div>
                         </div>
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
-                            <StatBar label="HP" current={activeEnemy.current_hp} max={activeEnemy.max_hp} color="red" icon={<Heart className="w-3 h-3" />} />
+                            <StatBar label="HP" current={activeEnemy.current_hp} max={activeEnemy.max_hp || 1} color="red" icon={<Heart className="w-3 h-3" />} />
                             <div className="h-3 bg-transparent hidden md:block" /> {/* Spacer */}
+                        </div>
+
+                        {/* Enemy Stats */}
+                        <div className="bg-slate-900/40 border border-red-500/20 p-3 rounded-2xl space-y-2 text-[10px] font-bold uppercase tracking-tighter">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Sword className="w-3 h-3" /> Урон
+                                    </div>
+                                    <div className="text-slate-200">
+                                        {(activeEnemy as any).enemy_stats?.min_damage || 1} - {(activeEnemy as any).enemy_stats?.max_damage || 2}
+                                    </div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Shield className="w-3 h-3" /> Броня
+                                    </div>
+                                    <div className="text-slate-200">{(activeEnemy as any).enemy_stats?.armor || 0}</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Target className="w-3 h-3" /> Меткость
+                                    </div>
+                                    <div className="text-red-400">+{((activeEnemy as any).enemy_stats?.accuracy || 0).toFixed(0)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Sparkles className="w-3 h-3" /> Уклонение
+                                    </div>
+                                    <div className="text-green-500">+{((activeEnemy as any).enemy_stats?.evasion || 0).toFixed(0)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Flame className="w-3 h-3" /> Крит
+                                    </div>
+                                    <div className="text-red-500">{((activeEnemy as any).enemy_stats?.crit_chance || 0).toFixed(1)}%</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Heart className="w-3 h-3" /> Реген HP
+                                    </div>
+                                    <div className="text-red-400">+{((activeEnemy as any).enemy_stats?.hp_regen || 0).toFixed(1)}/ход</div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="bg-red-500/5 border border-red-500/10 p-4 rounded-2xl flex items-center gap-4 justify-end md:justify-start">

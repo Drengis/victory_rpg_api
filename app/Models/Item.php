@@ -54,7 +54,7 @@ class Item extends Model
     /**
      * Получить реальное значение характеристики с учетом iLvl и редкости
      */
-    public function getBonus(string $stat, int $ilevel = 1): int
+    public function getBonus(string $stat, int $ilevel = 1, ?int $qualityOverride = null): int
     {
         $baseValue = $this->{$stat} ?? 0;
         
@@ -70,7 +70,7 @@ class Item extends Model
             self::QUALITY_LEGENDARY => 2.2,
         ];
 
-        $multiplier = $statMultipliers[$this->quality] ?? 1.0;
+        $multiplier = $statMultipliers[$qualityOverride ?? $this->quality] ?? 1.0;
         
         return (int) round($scaledBase * $multiplier);
     }
@@ -78,13 +78,13 @@ class Item extends Model
     /**
      * Рассчитать цену предмета с учетом iLvl и редкости
      */
-    public function calculatePrice(int $ilevel = 1): int
+    public function calculatePrice(int $ilevel = 1, ?int $qualityOverride = null): int
     {
         // 1. Базовая цена масштабируется по уровню (+20% за уровень)
         $scaledPrice = $this->base_price * (1 + ($ilevel - 1) * 0.2);
         
         // 2. Множитель редкости для экономики (x1, x3 и т.д.)
-        $multiplier = self::QUALITY_MULTIPLIERS[$this->quality] ?? 1.0;
+        $multiplier = self::QUALITY_MULTIPLIERS[$qualityOverride ?? $this->quality] ?? 1.0;
         
         return (int) round($scaledPrice * $multiplier);
     }
@@ -100,7 +100,7 @@ class Item extends Model
     /**
      * Получить список активных бонусов предмета в читаемом виде
      */
-    public function getBonusesList(int $ilevel = 1): array
+    public function getBonusesList(int $ilevel = 1, ?int $qualityOverride = null): array
     {
         $bonuses = [];
         
@@ -114,15 +114,15 @@ class Item extends Model
         ];
 
         foreach ($stats as $key => $label) {
-            $value = $this->getBonus($key, $ilevel);
+            $value = $this->getBonus($key, $ilevel, $qualityOverride);
             if ($value > 0) {
                 $bonuses[] = "+{$value} {$label}";
             }
         }
 
         if ($this->type === 'weapon') {
-            $min = $this->getBonus('min_damage', $ilevel);
-            $max = $this->getBonus('max_damage', $ilevel);
+            $min = $this->getBonus('min_damage', $ilevel, $qualityOverride);
+            $max = $this->getBonus('max_damage', $ilevel, $qualityOverride);
             $bonuses[] = "Урон: {$min}-{$max}";
         }
 
@@ -154,7 +154,7 @@ class Item extends Model
     {
         $array = parent::toArray();
         // По умолчанию для iLvl 1, если не указано иное
-        $array['display_stats'] = $this->getBonusesList($this->pivot->ilevel ?? 1);
+        $array['display_stats'] = $this->getBonusesList($this->pivot->ilevel ?? 1, $this->pivot->quality ?? null);
         return $array;
     }
 }

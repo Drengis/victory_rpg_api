@@ -53,11 +53,16 @@ class EnemyService extends BaseService
         $xpReward = round($enemy->base_experience * $scaleMult);
         $goldReward = round($enemy->base_gold * $scaleMult);
 
+        // Масштабируем броню
+        $baseArmor = $enemy->base_armor ?? 0;
+        $scaledArmor = round($baseArmor * $scaleMult);
+
         return array_merge($baseStats, $derived, [
             'physical_damage_bonus' => (int) $physicalBonus,
             'magical_damage_bonus' => (int) $magicalBonus,
             'min_damage' => (int) $finalMin,
             'max_damage' => (int) $finalMax,
+            'armor' => (int) $scaledArmor,
             'experience_reward' => (int) $xpReward,
             'gold_reward' => (int) $goldReward,
         ]);

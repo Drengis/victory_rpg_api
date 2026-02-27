@@ -5,13 +5,15 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import type { CharacterItem } from '../types/game';
 import {
     Package, Sword, Shield, Trash2, ArrowUpCircle,
-    Loader2, Info, Coins, Sparkles
+    Loader2, Coins
 } from 'lucide-react';
 import { sellItem } from '../api/shopApi';
+import ItemCard from '../components/ItemCard';
 
 const InventoryPage: React.FC = () => {
     // ... (внутри компонента)
     const handleSell = async (itemId: number) => {
+        if (!currentCharacter) return;
         if (!window.confirm('Вы уверены, что хотите продать этот предмет?')) return;
 
         setActionLoading(itemId);
@@ -151,9 +153,24 @@ const InventoryPage: React.FC = () => {
                                                         {item ? item.item.name : 'Пусто'}
                                                     </p>
                                                     {item && (
-                                                        <span className="text-[9px] bg-slate-900/50 text-slate-500 px-1 rounded font-mono border border-slate-800">
-                                                            Lvl {item.ilevel}
-                                                        </span>
+                                                        <>
+                                                            <span className="text-[9px] bg-slate-900/50 text-slate-500 px-1 rounded font-mono border border-slate-800">
+                                                                Lvl {item.ilevel}
+                                                            </span>
+                                                            {item.quality && item.quality > 1 && (
+                                                                <span className={`text-[9px] px-1 rounded font-bold border ${
+                                                                    item.quality === 2 ? 'bg-green-900/30 border-green-600 text-green-400' :
+                                                                    item.quality === 3 ? 'bg-blue-900/30 border-blue-600 text-blue-400' :
+                                                                    item.quality === 4 ? 'bg-purple-900/30 border-purple-600 text-purple-400' :
+                                                                    'bg-orange-900/30 border-orange-600 text-orange-400'
+                                                                }`}>
+                                                                    {item.quality === 2 ? 'Необычный' :
+                                                                     item.quality === 3 ? 'Редкий' :
+                                                                     item.quality === 4 ? 'Эпический' :
+                                                                     item.quality === 5 ? 'Легендарный' : ''}
+                                                                </span>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                                 {item && item.item.display_stats && (
@@ -205,73 +222,51 @@ const InventoryPage: React.FC = () => {
                                 <p className="font-bold uppercase tracking-widest">Пусто</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
-                                {backpack.map(item => (
-                                    <div key={item.id} className="group bg-slate-800/50 border border-slate-800 rounded-2xl p-4 hover:border-amber-500/50 transition-all relative">
-                                        <div className="w-full aspect-square bg-slate-900 rounded-xl mb-3 flex items-center justify-center relative">
-                                            {item.item.type === 'weapon' ? <Sword className="w-8 h-8 text-slate-700" /> : <Package className="w-8 h-8 text-slate-700" />}
-                                            {item.quantity > 1 && (
-                                                <span className="absolute bottom-1 right-2 text-[10px] font-bold bg-slate-800 text-slate-300 px-1.5 rounded-md border border-slate-700">
-                                                    x{item.quantity}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                            <h4 className="text-xs font-bold text-slate-200 truncate" title={item.item.name}>{item.item.name}</h4>
-                                            <span className="text-[9px] font-mono text-slate-500">Lvl {item.ilevel}</span>
-                                        </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+                                {backpack.map(item => {
+                                    const isWrongClass = item.item.required_class && currentCharacter?.class && item.item.required_class.toLowerCase() !== currentCharacter.class.toLowerCase();
+                                    const canEquip = !isWrongClass && !['material', 'junk'].includes(item.item.type);
 
-                                        {/* Item Stats */}
-                                        {item.item.display_stats && item.item.display_stats.length > 0 && (
-                                            <div className="mt-2 space-y-0.5">
-                                                {item.item.display_stats.map((stat, idx) => (
-                                                    <div key={idx} className="flex items-center gap-1 text-[9px] font-medium text-amber-500/80">
-                                                        <Sparkles className="w-2.5 h-2.5 opacity-40" />
-                                                        {stat}
-                                                    </div>
-                                                ))}
+                                    return (
+                                        <div key={item.id} className="relative group">
+                                            <ItemCard 
+                                                item={item.item} 
+                                                ilevel={item.ilevel}
+                                                quality={item.quality ?? undefined}
+                                                playerClass={currentCharacter?.class}
+                                                hideActions
+                                            />
+                                            
+                                            {/* Action Overlay */}
+                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-slate-900/95 rounded-b-xl flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {['material', 'junk'].includes(item.item.type) ? (
+                                                    <p className="text-[10px] text-slate-500 w-full text-center">Используется для крафта</p>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleEquip(item.id, item.item.type)}
+                                                            disabled={!canEquip || actionLoading !== null}
+                                                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${canEquip
+                                                                ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                                                                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            {actionLoading === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Надеть'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSell(item.id)}
+                                                            disabled={actionLoading !== null}
+                                                            className="flex-1 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1"
+                                                        >
+                                                            <Coins className="w-3 h-3" />
+                                                            Продать
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
-                                        )}
-
-                                        <div className="flex items-center justify-between mt-auto pt-2">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase">{item.item.type}</span>
-                                            {item.item.base_price > 0 && (
-                                                <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
-                                                    <Coins className="w-3 h-3" />
-                                                    {Math.floor(item.item.base_price * 0.5)}
-                                                </div>
-                                            )}
                                         </div>
-
-                                        {/* Action Overlay */}
-                                        <div className="absolute inset-0 bg-slate-900/90 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-2">
-                                            {['material', 'junk'].includes(item.item.type) ? (
-                                                <p className="text-[10px] text-slate-500 lowercase">Используется для крафта</p>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleEquip(item.id, item.item.type)}
-                                                    disabled={actionLoading !== null}
-                                                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all"
-                                                >
-                                                    {actionLoading === item.id ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Надеть'}
-                                                </button>
-                                            )}
-
-                                            <button
-                                                onClick={() => handleSell(item.id)}
-                                                disabled={actionLoading !== null}
-                                                className="w-full py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2"
-                                            >
-                                                {actionLoading === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Coins className="w-3 h-3" />}
-                                                Продать
-                                            </button>
-
-                                            <button className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1">
-                                                <Info className="w-3 h-3" /> Инфо
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
