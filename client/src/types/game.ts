@@ -143,7 +143,7 @@ export interface ClassAbility {
     class: string;
     level_required: number;
     ability_name: string;
-    ability_type: 'attack' | 'defense' | 'buff' | 'utility';
+    ability_type: 'attack' | 'defense' | 'buff' | 'utility' | 'passive';
     mp_cost: number;
     gold_cost: number;
     max_uses_per_combat: number | null;

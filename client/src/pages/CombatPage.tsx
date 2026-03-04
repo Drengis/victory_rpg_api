@@ -197,10 +197,10 @@ const CombatPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
                                     <div className="flex items-center gap-1 text-slate-500 mb-1">
-                                        <Sword className="w-3 h-3" /> Урон
+                                        <Sword className="w-3 h-3" /> {currentCharacter!.class === 'Маг' ? 'Маг. урон' : 'Урон'}
                                     </div>
                                     <div className="text-slate-200">
-                                        {playerStats?.min_damage || 1} - {playerStats?.max_damage || 2}
+                                        {Math.round(playerStats?.min_damage || 1)} - {Math.round(playerStats?.max_damage || 2)}
                                     </div>
                                 </div>
                                 <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
@@ -208,10 +208,10 @@ const CombatPage: React.FC = () => {
                                         <Shield className="w-3 h-3" /> Броня
                                     </div>
                                     <div className="text-slate-200">
-                                        {playerStats?.armor || 0}
+                                        {Math.round(playerStats?.armor || 0)}
                                         {(playerDynamic?.temp_armor || 0) > 0 && (
                                             <span className="text-green-400 text-[8px] ml-1">
-                                                [+{playerDynamic.temp_armor} ({playerDynamic.temp_armor_duration}ход)]
+                                                [+{Math.round(playerDynamic!.temp_armor!)} ({playerDynamic!.temp_armor_duration}ход)]
                                             </span>
                                         )}
                                     </div>
@@ -230,7 +230,7 @@ const CombatPage: React.FC = () => {
                                         +{(playerStats?.evasion || 0).toFixed(0)}%
                                         {(playerDynamic?.temp_evasion || 0) > 0 && (
                                             <span className="text-green-400 text-[8px] ml-1">
-                                                [+{playerDynamic.temp_evasion} ({playerDynamic.temp_evasion_duration}ход)]
+                                                [+{Math.round(playerDynamic!.temp_evasion!)} ({playerDynamic!.temp_evasion_duration}ход)]
                                             </span>
                                         )}
                                     </div>
@@ -300,7 +300,7 @@ const CombatPage: React.FC = () => {
                             <Star className="w-3 h-3" /> Способности
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
-                            {abilities.map((ability) => {
+                            {abilities.filter(a => a.ability_type !== 'passive').map((ability) => {
                                 const isSelected = selectedAbility?.id === ability.id;
                                 const canAfford = (playerDynamic?.current_mp ?? 0) >= ability.mp_cost;
                                 return (
@@ -341,6 +341,29 @@ const CombatPage: React.FC = () => {
                                 );
                             })}
                         </div>
+
+                        {/* Passive Skills Section */}
+                        {abilities.some(a => a.ability_type === 'passive') && (
+                            <div className="mt-4 pt-4 border-t border-slate-800">
+                                <h5 className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                    <Zap className="w-2.5 h-2.5" /> Пассивные усиления
+                                </h5>
+                                <div className="flex flex-wrap gap-2">
+                                    {abilities.filter(a => a.ability_type === 'passive').map(ability => (
+                                        <div
+                                            key={ability.id}
+                                            className="px-2 py-1 bg-slate-950 border border-slate-800/50 rounded-lg text-[10px] text-slate-400 flex items-center gap-2 group/pass relative"
+                                            title={ability.description}
+                                        >
+                                            <span className="font-bold">{ability.ability_name}</span>
+                                            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 hidden group-hover/pass:block z-50 pointer-events-none">
+                                                {ability.description}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         {selectedAbility && (
                             <div className="mt-4 flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 px-3">
                                 <span className="text-[10px] text-amber-500 font-bold uppercase flex items-center gap-2">

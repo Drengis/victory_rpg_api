@@ -83,6 +83,10 @@ class Character extends Model
      */
     public function getDynamicStatsAttribute()
     {
+        // Используем уже подгруженную связь, если она есть, чтобы не делать лишний запрос
+        if ($this->relationLoaded('dynamicStats')) {
+            return $this->getRelationValue('dynamicStats');
+        }
         return $this->dynamicStats()->first();
     }
 

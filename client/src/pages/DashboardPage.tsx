@@ -7,6 +7,13 @@ import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2
 import { formatNumber } from '../lib/utils';
 import { goDeeper, startCombat, changeDepth } from '../api/combatApi';
 
+const DetailStat: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+    <div className="flex justify-between items-center text-sm">
+        <span className="text-slate-500 uppercase text-[10px] font-bold">{label}</span>
+        <span className="text-slate-300 font-mono">{value}</span>
+    </div>
+);
+
 const DashboardPage: React.FC = () => {
     const { currentCharacter, setCurrentCharacter } = useGameStore();
     const navigate = useNavigate();
@@ -18,7 +25,7 @@ const DashboardPage: React.FC = () => {
     useEffect(() => {
         const syncData = async () => {
             if (!currentCharacter) return;
-            setSyncing(true);
+            // setSyncing(true); // Don't show loading spinner for background sync
             try {
                 const response = await api.get(`/characters/${currentCharacter.id}`);
                 if (response.data.data) {
@@ -32,7 +39,11 @@ const DashboardPage: React.FC = () => {
         };
 
         syncData();
-    }, []);
+
+        // Добавляем опрос сервера каждые 5 секунд для обновления регена
+        const interval = setInterval(syncData, 5000);
+        return () => clearInterval(interval);
+    }, [currentCharacter?.id]);
 
     if (!currentCharacter) {
         return <Navigate to="/characters" />;
@@ -349,9 +360,9 @@ const DashboardPage: React.FC = () => {
                         <div className="space-y-4">
                             <div className="flex justify-between items-center group">
                                 <span className="text-slate-400 flex items-center gap-2 group-hover:text-slate-300 transition-colors">
-                                    <Target className="w-4 h-4" /> Урон
+                                    <Target className="w-4 h-4" /> {char.class === 'Маг' ? 'Маг. урон' : 'Урон'}
                                 </span>
-                                <span className="font-bold text-slate-100">{stats.min_damage} - {stats.max_damage}</span>
+                                <span className="font-bold text-slate-100">{Math.round(stats.min_damage)} - {Math.round(stats.max_damage)}</span>
                             </div>
                             <div className="flex justify-between items-center group">
                                 <span className="text-slate-400 flex items-center gap-2 group-hover:text-slate-300 transition-colors">
@@ -363,26 +374,13 @@ const DashboardPage: React.FC = () => {
 
                         {/* Detailed Stats Expandable */}
                         <div className={`space-y-3 pt-4 border-t border-slate-800 overflow-hidden transition-all duration-500 ${showDetails ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 mb-[-1.5rem]'}`}>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-500 uppercase text-[10px] font-bold">Меткость</span>
-                                <span className="text-slate-300 font-mono">+{formatNumber(stats.accuracy)}%</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-500 uppercase text-[10px] font-bold">Уклонение</span>
-                                <span className="text-slate-300 font-mono">+{formatNumber(stats.evasion)}%</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-500 uppercase text-[10px] font-bold">Крит. шанс</span>
-                                <span className="text-slate-300 font-mono">+{formatNumber(stats.crit_chance)}%</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-500 uppercase text-[10px] font-bold">Реген HP</span>
-                                <span className="text-slate-300 font-mono">+{formatNumber(stats.hp_regen)}/ход</span>
-                            </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-500 uppercase text-[10px] font-bold">Реген MP</span>
-                                <span className="text-slate-300 font-mono">+{formatNumber(stats.mp_regen)}/ход</span>
-                            </div>
+                            <DetailStat label="Меткость" value={`+${formatNumber(stats.accuracy)}%`} />
+                            <DetailStat label="Уклонение" value={`+${formatNumber(stats.evasion)}%`} />
+                            <DetailStat label="Крит. шанс" value={`${formatNumber(stats.crit_chance)}%`} />
+                            <DetailStat label="Реген HP" value={`+${formatNumber(stats.hp_regen)}/ход`} />
+                            <DetailStat label="Реген MP" value={`+${formatNumber(stats.mp_regen)}/ход`} />
+                            <DetailStat label="Физ. урон" value={`+${formatNumber(stats.physical_damage_bonus)}%`} />
+                            <DetailStat label="Маг. урон" value={`+${formatNumber(stats.magical_damage_bonus)}%`} />
                         </div>
 
                         <button

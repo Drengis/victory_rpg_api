@@ -119,21 +119,20 @@ class CharacterService extends BaseService
         // 3. Расчет боевых параметров на основе итоговых стат
         $stats = $this->getDerivedStats($modifiedStats);
         
-        // Инициализация бонусов урона
-        $stats['physical_damage_bonus'] = 0;
-        $stats['magical_damage_bonus'] = 0;
+        // Инициализация бонусов урона (Универсальные бонусы)
+        $stats['physical_damage_bonus'] = $modifiedStats['strength'] * 1; // 1% за 1 силы всем
+        $stats['magical_damage_bonus'] = $modifiedStats['intelligence'] * 1; // 1% за 1 инт всем
 
         // Классовые бонусы к урону и точности
         $class = mb_strtolower($character->class);
         if ($class === 'воин') {
-            $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 2;
+            $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 1; // Итого 2%
             $stats['accuracy'] += $modifiedStats['strength'] * 0.5;
         } elseif ($class === 'лучник') {
             $stats['accuracy'] += $modifiedStats['agility'] * 2;
-            $stats['physical_damage_bonus'] += $modifiedStats['strength'] * 1;
             $stats['physical_damage_bonus'] += $modifiedStats['agility'] * 1;
         } elseif ($class === 'маг') {
-            $stats['magical_damage_bonus'] += $modifiedStats['intelligence'] * 2;
+            $stats['magical_damage_bonus'] += $modifiedStats['intelligence'] * 1; // Итого 2%
             $stats['accuracy'] += $modifiedStats['intelligence'] * 0.5;
         }
 
@@ -168,6 +167,28 @@ class CharacterService extends BaseService
         }
 
         $stats['armor'] = ($gearStats['armor'] ?? 0) + ($stats['armor'] ?? 0);
+        // 5. Применение пассивных навыков
+        $passives = $character->abilities()->where('ability_type', 'passive')->get();
+        foreach ($passives as $passive) {
+            $formula = $passive->effect_formula;
+            // Просто парсим формулу вида "stat * 0.X"
+            if (preg_match('/([a-z_]+)\s*\*\s*([0-9.]+)/', $formula, $matches)) {
+                $targetStat = $matches[1];
+                $multiplier = (float)$matches[2];
+                
+                if (isset($stats[$targetStat])) {
+                    $stats[$targetStat] += $stats[$targetStat] * $multiplier;
+                } elseif (isset($modifiedStats[$targetStat])) {
+                    // Если стат еще в модифицированных (базовых), применяем там
+                    $modifiedStats[$targetStat] += $modifiedStats[$targetStat] * $multiplier;
+                }
+            }
+        }
+
+        // Финальное округление всех статов
+        foreach ($stats as $key => $val) {
+            $stats[$key] = round($val, 2);
+        }
 
         return array_merge($modifiedStats, $stats);
     }

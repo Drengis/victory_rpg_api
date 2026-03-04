@@ -34,7 +34,7 @@ const StatBar: React.FC<StatBarProps> = ({ current, max, label, color, icon }) =
                     {label}
                 </div>
                 <div className="text-xs font-mono text-slate-200">
-                    {Math.floor(current)} / {max}
+                    {Math.floor(current)} / {Math.round(max)}
                 </div>
             </div>
             <div className={cn("h-3 w-full rounded-full overflow-hidden border border-slate-800 shadow-inner", bgColors[color])}>

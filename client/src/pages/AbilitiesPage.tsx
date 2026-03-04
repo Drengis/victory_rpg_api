@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { getAllAbilities, unlockAbility } from '../api/combatApi';
 import type { ClassAbility } from '../types/game';
-import { Star, Lock, Unlock, Zap, Flame, Shield, Droplets, Coins, Loader2, Info, Timer } from 'lucide-react';
+import { Star, Lock, Unlock, Zap, Flame, Shield, Droplets, Coins, Loader2, Info, Timer, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AbilitiesPage: React.FC = () => {
     const { currentCharacter, setCurrentCharacter } = useGameStore();
+    const navigate = useNavigate();
     const [abilities, setAbilities] = useState<ClassAbility[]>([]);
     const [loading, setLoading] = useState(true);
     const [unlockingId, setUnlockingId] = useState<number | null>(null);
@@ -73,11 +75,20 @@ const AbilitiesPage: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-20">
             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                        <Star className="text-amber-500" /> УМЕНИЯ И НАВЫКИ
-                    </h2>
-                    <p className="text-slate-400 text-sm">Изучайте новые способности, чтобы стать сильнее в бою</p>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white"
+                        title="Вернуться в хаб"
+                    >
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <div>
+                        <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+                            <Star className="text-amber-500" /> УМЕНИЯ И НАВЫКИ
+                        </h2>
+                        <p className="text-slate-400 text-sm">Изучайте новые способности, чтобы стать сильнее в бою</p>
+                    </div>
                 </div>
                 <div className="bg-slate-900/80 border border-slate-800 px-6 py-3 rounded-2xl flex items-center gap-3">
                     <Coins className="text-yellow-500 w-5 h-5" />
@@ -109,6 +120,8 @@ const AbilitiesPage: React.FC = () => {
                                     }`}>
                                     {ability.ability_type === 'attack' ? (
                                         <Flame className={`w-7 h-7 ${ability.is_unlocked ? 'text-red-500' : 'text-slate-700'}`} />
+                                    ) : ability.ability_type === 'passive' ? (
+                                        <Zap className={`w-7 h-7 ${ability.is_unlocked ? 'text-amber-500' : 'text-slate-700'}`} />
                                     ) : (
                                         <Shield className={`w-7 h-7 ${ability.is_unlocked ? 'text-cyan-500' : 'text-slate-700'}`} />
                                     )}
@@ -118,9 +131,16 @@ const AbilitiesPage: React.FC = () => {
                                         {ability.ability_name}
                                     </h4>
                                     <div className="flex items-center gap-3 mt-1 text-[10px] font-bold uppercase tracking-wider">
-                                        <span className="flex items-center gap-1 text-blue-500">
-                                            <Droplets className="w-3 h-3" /> {ability.mp_cost} MP
-                                        </span>
+                                        {ability.ability_type !== 'passive' && (
+                                            <span className="flex items-center gap-1 text-blue-500">
+                                                <Droplets className="w-3 h-3" /> {ability.mp_cost} MP
+                                            </span>
+                                        )}
+                                        {ability.ability_type === 'passive' && (
+                                            <span className="flex items-center gap-1 text-amber-500">
+                                                <Zap className="w-3 h-3" /> Пассивный
+                                            </span>
+                                        )}
                                         {ability.duration > 1 && (
                                             <span className="flex items-center gap-1 text-slate-500">
                                                 <Timer className="w-3 h-3" /> {ability.duration} ходов
@@ -173,7 +193,7 @@ const AbilitiesPage: React.FC = () => {
                         {ability.is_unlocked && (
                             <div className="text-[10px] text-emerald-500/60 font-medium uppercase tracking-[0.2em] flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Навык изучен и доступен в бою
+                                {ability.ability_type === 'passive' ? 'Навык активен постоянно' : 'Навык изучен и доступен в бою'}
                             </div>
                         )}
                     </div>
@@ -186,8 +206,8 @@ const AbilitiesPage: React.FC = () => {
                 <div className="space-y-1">
                     <h5 className="text-amber-500 font-bold text-sm uppercase tracking-wide">Подсказка</h5>
                     <p className="text-slate-400 text-sm leading-relaxed">
-                        Некоторые навыки имеют длительность более одного хода. Защитные стойки воина и лучника теперь действуют 2 хода,
-                        что позволяет атаковать на следующем ходу, сохраняя бонус к защите!
+                        Пассивные навыки (иконка молнии) действуют постоянно и автоматически улучшают ваши характеристики.
+                        Защитные стойки и умения теперь имеют длительность, что позволяет комбинировать их в бою!
                     </p>
                 </div>
             </div>

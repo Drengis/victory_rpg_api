@@ -38,11 +38,35 @@ class CharacterController extends BaseController
 
     public function index(Request $request): JsonResponse
     {
-        $request->merge([
-            'user_id' => auth()->id(),
-            'with' => ['stats', 'dynamicStats']
-        ]);
-        return parent::index($request);
+        $relations = ['stats', 'dynamicStats'];
+        $paginate = $request->has('paginate')
+            ? filter_var($request->input('paginate'), FILTER_VALIDATE_BOOLEAN)
+            : true;
+
+        $characters = $this->service->getAll(
+            relations: $relations,
+            paginate: $paginate,
+            filters: ['user_id' => auth()->id()]
+        );
+
+        // Обновляем динамические показатели для каждого персонажа (регенерация)
+        if ($paginate) {
+            foreach ($characters->items() as $character) {
+                $this->service->syncStats($character);
+                $character->load(['stats', 'dynamicStats']); // Перезагружаем статы для расчета регенерации
+                $this->service->refreshDynamicStats($character);
+            }
+        } else {
+            foreach ($characters as $character) {
+                // Синхронизируем статы, чтобы max HP/MP были актуальны
+                $this->service->syncStats($character);
+                $character->load(['stats', 'dynamicStats']); // Перезагружаем статы для расчета регенерации
+                // Обновляем динамические показатели
+                $this->service->refreshDynamicStats($character);
+            }
+        }
+
+        return $this->successResponse($characters);
     }
 
     /**
@@ -73,7 +97,15 @@ class CharacterController extends BaseController
     public function show(int $id, Request $request): JsonResponse
     {
         $character = $this->service->getById($id);
+        
+        // Сначала пересчитываем основные статы (броня, HP и т.д.)
+        $this->service->syncStats($character);
+        $character->load(['stats', 'dynamicStats']);
+        
+        // Затем обновляем динамику (регенерация) на основе новых стат
         $this->service->refreshDynamicStats($character);
+        
+        // Получаем полные данные для отображения
         $fullData = $this->service->calculateFinalStats($character);
         
         return $this->successResponse(array_merge(

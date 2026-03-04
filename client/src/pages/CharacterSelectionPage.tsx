@@ -15,8 +15,7 @@ const CharacterSelectionPage: React.FC = () => {
     useEffect(() => {
         const fetchCharacters = async () => {
             try {
-                const response = await api.get('/characters?paginate=false');
-                // API Laravel возвращает { success: true, data: [...] } при paginate=false
+                const response = await api.get(`/characters?paginate=false&t=${Date.now()}`);
                 setCharacters(response.data.data || []);
             } catch (err) {
                 setError('Не удалось загрузить список персонажей');
@@ -26,6 +25,8 @@ const CharacterSelectionPage: React.FC = () => {
         };
 
         fetchCharacters();
+        const interval = setInterval(fetchCharacters, 5000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleSelect = (char: Character) => {
@@ -104,7 +105,7 @@ const CharacterSelectionPage: React.FC = () => {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
                                         <span>HP</span>
-                                        <span>{Math.round(char.dynamic_stats?.current_hp || 0)} / {char.stats?.max_hp}</span>
+                                        <span>{Math.round(char.dynamic_stats?.current_hp || 0)} / {Math.round(char.stats?.max_hp || 0)}</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                                         <div
@@ -116,7 +117,7 @@ const CharacterSelectionPage: React.FC = () => {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
                                         <span>MP</span>
-                                        <span>{Math.round(char.dynamic_stats?.current_mp || 0)} / {char.stats?.max_mp}</span>
+                                        <span>{Math.round(char.dynamic_stats?.current_mp || 0)} / {Math.round(char.stats?.max_mp || 0)}</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                                         <div
