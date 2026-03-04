@@ -14,17 +14,20 @@ class CombatService
     protected AbilityService $abilityService;
     protected RewardService $rewardService;
     protected CharacterService $characterService;
+    protected QuestService $questService;
 
     public function __construct(
         EnemyService $enemyService,
         AbilityService $abilityService,
         RewardService $rewardService,
-        CharacterService $characterService
+        CharacterService $characterService,
+        QuestService $questService
     ) {
         $this->enemyService = $enemyService;
         $this->abilityService = $abilityService;
         $this->rewardService = $rewardService;
         $this->characterService = $characterService;
+        $this->questService = $questService;
     }
 
     /**
@@ -211,6 +214,9 @@ class CombatService
                 $combat->save();
 
                 $logs[] = "☠️ Противник {$enemy->name} повержен!";
+
+                // Обновляем прогресс квестов
+                $this->questService->updateProgress($character, 'kills', 1);
             }
 
             if ($combat->participants()->count() === 0) {

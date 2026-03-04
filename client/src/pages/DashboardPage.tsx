@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import api from '../api/axios';
 import { Navigate, useNavigate } from 'react-router-dom';
 import StatBar from '../components/StatBar';
-import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft, Star } from 'lucide-react';
+import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft, Star, ScrollText, Trophy } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 import { goDeeper, startCombat, changeDepth } from '../api/combatApi';
 
@@ -21,6 +21,7 @@ const DashboardPage: React.FC = () => {
     const [syncing, setSyncing] = useState(false);
     const [searching, setSearching] = useState(false);
     const [distributing, setDistributing] = useState<string | null>(null);
+    const [questSummary, setQuestSummary] = useState<{ available: number, ready: number }>({ available: 0, ready: 0 });
 
     useEffect(() => {
         const syncData = async () => {
@@ -30,6 +31,15 @@ const DashboardPage: React.FC = () => {
                 const response = await api.get(`/characters/${currentCharacter.id}`);
                 if (response.data.data) {
                     setCurrentCharacter(response.data.data);
+                }
+
+                // Синхронизируем квесты
+                const questsRes = await api.get('/quests', { params: { character_id: currentCharacter.id } });
+                if (questsRes.data.success) {
+                    const quests = questsRes.data.data;
+                    const available = quests.filter((q: any) => q.pivot.status === 'available').length;
+                    const ready = quests.filter((q: any) => q.pivot.status === 'ready').length;
+                    setQuestSummary({ available, ready });
                 }
             } catch (err) {
                 console.error("Failed to sync character data", err);
@@ -151,6 +161,39 @@ const DashboardPage: React.FC = () => {
                         <p className="text-amber-200 font-bold text-sm">У вас есть свободные очки характеристик!</p>
                         <p className="text-amber-400/70 text-xs">Доступно: <span className="font-bold text-amber-300">{statPoints}</span> очков. Распределите их в блоке «Характеристики» ниже.</p>
                     </div>
+                </div>
+            )}
+
+            {/* Quest Notifications */}
+            {questSummary.ready > 0 && (
+                <div
+                    onClick={() => navigate('/quests')}
+                    className="bg-green-900/30 border border-green-700/50 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-green-900/40 transition-all shadow-lg shadow-green-900/20"
+                >
+                    <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-900/40">
+                        <Trophy className="w-5 h-5 text-white animate-bounce" />
+                    </div>
+                    <div>
+                        <p className="text-green-200 font-bold text-sm">Задание выполнено!</p>
+                        <p className="text-green-400/70 text-xs">У вас есть <span className="font-bold text-green-300">{questSummary.ready}</span> готовых заданий. Заберите свою награду!</p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-green-500 ml-auto" />
+                </div>
+            )}
+
+            {questSummary.available > 0 && (
+                <div
+                    onClick={() => navigate('/quests')}
+                    className="bg-blue-900/30 border border-blue-700/50 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-blue-900/40 transition-all shadow-lg shadow-blue-900/20"
+                >
+                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40">
+                        <ScrollText className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <p className="text-blue-200 font-bold text-sm">Новые поручения</p>
+                        <p className="text-blue-400/70 text-xs">Доступно <span className="font-bold text-blue-300">{questSummary.available}</span> новых заданий в журнале.</p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-blue-500 ml-auto" />
                 </div>
             )}
 
@@ -325,6 +368,19 @@ const DashboardPage: React.FC = () => {
                             <div>
                                 <h4 className="text-2xl font-bold text-slate-100 mb-1">Навыки</h4>
                                 <p className="text-slate-500 text-sm">Способности класса</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/quests')}
+                            className="group p-8 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl text-left transition-all flex items-center gap-6"
+                        >
+                            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center group-hover:bg-slate-700 transition-colors">
+                                <ScrollText className="w-8 h-8 text-slate-400 group-hover:text-amber-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-2xl font-bold text-slate-100 mb-1">Задания</h4>
+                                <p className="text-slate-500 text-sm">Квесты и награды</p>
                             </div>
                         </button>
                     </div>

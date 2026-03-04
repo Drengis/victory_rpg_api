@@ -100,6 +100,13 @@ class Character extends Model
         return $this->hasMany(CharacterItem::class)->where('is_equipped', true);
     }
 
+    public function quests(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Quest::class, 'character_quests')
+            ->withPivot('current_value', 'status')
+            ->withTimestamps();
+    }
+
     public function getNextLevelXpAttribute(): int
     {
         $level = $this->level;

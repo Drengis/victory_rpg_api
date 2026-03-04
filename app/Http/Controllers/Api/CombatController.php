@@ -287,6 +287,9 @@ class CombatController extends Controller
                 $character->save();
             }
             $dynamic->update(['enemies_defeated_at_depth' => 0]);
+            
+            // Обновляем прогресс квестов на глубину
+            app(\App\Services\QuestService::class)->updateProgress($character, 'reach_depth', 0);
         });
 
         return response()->json([
@@ -324,6 +327,9 @@ class CombatController extends Controller
         }
 
         $character->update(['dungeon_depth' => $request->depth]);
+
+        // Обновляем прогресс квестов на глубину
+        app(\App\Services\QuestService::class)->updateProgress($character, 'reach_depth', 0);
 
         return response()->json([
             'success' => true,

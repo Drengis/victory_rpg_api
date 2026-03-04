@@ -8,6 +8,7 @@ use App\Models\CharacterDynamicStat;
 use App\Models\CharacterItem;
 use App\Models\Item;
 use App\Services\Core\BaseService;
+use App\Services\QuestService;
 use App\Traits\CalculatesDerivedStats;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +16,16 @@ use Illuminate\Support\Facades\DB;
 class CharacterService extends BaseService
 {
     use CalculatesDerivedStats;
+    protected QuestService $questService;
+
     protected function getModel(): string
     {
         return Character::class;
+    }
+
+    public function __construct(QuestService $questService)
+    {
+        $this->questService = $questService;
     }
 
     /**
@@ -368,9 +376,9 @@ class CharacterService extends BaseService
      */
     public function calculateXpForLevel(int $level): int
     {
-        if ($level < 1) return 100;
+        if ($level < 1) return 80;
         $n_minus_1 = $level - 1;
-        return 100 + (30 * $n_minus_1) + (10 * ($n_minus_1 ** 2));
+        return 80 + (20 * $n_minus_1) + (5 * ($n_minus_1 ** 2));
     }
 
     /**
@@ -391,6 +399,9 @@ class CharacterService extends BaseService
 
         $character->save();
         $this->syncStats($character);
+
+        // Обновляем прогресс квестов на уровень
+        $this->questService->updateProgress($character, 'level_up', 0);
     }
 
     /**

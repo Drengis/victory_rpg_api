@@ -43,4 +43,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/shops', [\App\Http\Controllers\Api\ShopController::class, 'index']);
     Route::get('/shops/{shop}', [\App\Http\Controllers\Api\ShopController::class, 'show']);
     Route::post('/shops/{shop}/buy', [\App\Http\Controllers\Api\ShopController::class, 'buy']);
+
+    // Quests
+    Route::get('/quests', [\App\Http\Controllers\Api\QuestController::class, 'index']);
+    Route::post('/quests/{quest}/accept', [\App\Http\Controllers\Api\QuestController::class, 'accept']);
+    Route::post('/quests/{quest}/claim', [\App\Http\Controllers\Api\QuestController::class, 'claimReward']);
 });
