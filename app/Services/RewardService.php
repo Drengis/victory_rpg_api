@@ -38,9 +38,10 @@ class RewardService
             $this->currencyService->addGold($character, $goldReward);
 
             // 3. Прогресс подземелья (только на максимальной доступной глубине)
-            if ($character->dungeon_depth >= $character->max_dungeon_depth) {
+            if ((int)$character->dungeon_depth === (int)$character->max_dungeon_depth) {
                 $dynamic = $character->dynamicStats;
-                $dynamic->increment('enemies_defeated_at_depth');
+                $dynamic->enemies_defeated_at_depth += 1;
+                $dynamic->save();
             }
 
             // 4. Сохраняем выпавшие предметы

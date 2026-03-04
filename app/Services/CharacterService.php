@@ -376,9 +376,9 @@ class CharacterService extends BaseService
      */
     public function calculateXpForLevel(int $level): int
     {
-        if ($level < 1) return 80;
+        if ($level < 1) return 100;
         $n_minus_1 = $level - 1;
-        return 80 + (20 * $n_minus_1) + (5 * ($n_minus_1 ** 2));
+        return 100 + (30 * $n_minus_1) + (10 * ($n_minus_1 ** 2));
     }
 
     /**
@@ -410,28 +410,36 @@ class CharacterService extends BaseService
      */
     public function distributeStatPoint(Character $character, string $stat): void
     {
-        if ($character->stat_points <= 0) {
-            throw new \Exception("Недостаточно очков характеристик.");
-        }
-
         $validStats = ['strength', 'agility', 'constitution', 'intelligence', 'luck'];
         if (!in_array($stat, $validStats)) {
             throw new \Exception("Невалидная характеристика.");
         }
 
-        // Валидация: Максимум 2 очка в одну характеристику за уровень.
-        // Это значит, что для уровня L, сумма вложенных очков в одну стату не может превышать (L-1) * 2.
-        $addedField = $stat . '_added';
-        $currentAdded = $character->{$addedField};
-        $limit = ($character->level - 1) * 2;
+        DB::transaction(function () use ($character, $stat) {
+            // Блокируем запись персонажа для обновления
+            $lockedCharacter = Character::where('id', $character->id)->lockForUpdate()->first();
 
-        if ($currentAdded >= $limit) {
-            throw new \Exception("Достигнут предел прокачки этой характеристики для текущего уровня.");
-        }
+            if ($lockedCharacter->stat_points <= 0) {
+                throw new \Exception("Недостаточно очков характеристик.");
+            }
 
-        $character->{$addedField}++;
-        $character->stat_points--;
-        $character->save();
+            // Валидация: Максимум 2 очка в одну характеристику за уровень.
+            $addedField = $stat . '_added';
+            $currentAdded = $lockedCharacter->{$addedField};
+            $limit = ($lockedCharacter->level - 1) * 2;
+
+            if ($currentAdded >= $limit) {
+                throw new \Exception("Достигнут предел прокачки этой характеристики для текущего уровня.");
+            }
+
+            // Обновляем заблокированную модель
+            $lockedCharacter->{$addedField}++;
+            $lockedCharacter->stat_points--;
+            $lockedCharacter->save();
+
+            // Синхронизируем состояние исходного объекта, чтобы контроллер видел изменения
+            $character->setRawAttributes($lockedCharacter->getAttributes(), true);
+        });
 
         $this->syncStats($character);
     }
@@ -473,5 +481,52 @@ class CharacterService extends BaseService
         ]);
 
         $this->syncStats($character);
+    }
+
+    /**
+     * Добавить предмет в инвентарь персонажа
+     */
+    public function addItemToCharacter(Character $character, Item $item, int $quantity = 1, int $ilevel = 1, ?int $quality = null): void
+    {
+        if ($quantity <= 0) return;
+
+        DB::transaction(function () use ($character, $item, $quantity, $ilevel, $quality) {
+            // Если предмет стакается (материалы, расходники)
+            if (in_array($item->type, ['material', 'junk', 'consumable', 'resource'])) {
+                $existing = CharacterItem::where('character_id', $character->id)
+                    ->where('item_id', $item->id)
+                    ->where('ilevel', $ilevel)
+                    ->first();
+
+                if ($existing) {
+                    $existing->quantity += $quantity;
+                    $existing->save();
+                } else {
+                    CharacterItem::create([
+                        'character_id' => $character->id,
+                        'item_id' => $item->id,
+                        'ilevel' => $ilevel,
+                        'quantity' => $quantity,
+                        'quality' => $quality ?? $item->quality,
+                        'is_equipped' => false,
+                    ]);
+                }
+            } else {
+                // Экипировка всегда создается отдельными записями
+                for ($i = 0; $i < $quantity; $i++) {
+                    CharacterItem::create([
+                        'character_id' => $character->id,
+                        'item_id' => $item->id,
+                        'ilevel' => $ilevel,
+                        'quantity' => 1,
+                        'quality' => $quality ?? $item->quality,
+                        'is_equipped' => false,
+                    ]);
+                }
+            }
+
+            // После добавления предмета обновляем прогресс квестов типа "loot"
+            $this->questService->updateProgress($character, 'loot', 0);
+        });
     }
 }

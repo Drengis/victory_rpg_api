@@ -226,6 +226,7 @@ const InventoryPage: React.FC = () => {
                                                 quality={item.quality ?? undefined}
                                                 playerClass={currentCharacter?.class}
                                                 isEquipped={item.is_equipped}
+                                                quantity={item.quantity}
                                                 hideActions
                                             />
 

@@ -281,11 +281,11 @@ class CombatController extends Controller
         }
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($character, $dynamic) {
-            $character->increment('dungeon_depth');
-            if ($character->dungeon_depth > $character->max_dungeon_depth) {
-                $character->max_dungeon_depth = $character->dungeon_depth;
-                $character->save();
-            }
+            $newMaxDepth = $character->max_dungeon_depth + 1;
+            $character->max_dungeon_depth = $newMaxDepth;
+            $character->dungeon_depth = $newMaxDepth;
+            $character->save();
+
             $dynamic->update(['enemies_defeated_at_depth' => 0]);
             
             // Обновляем прогресс квестов на глубину

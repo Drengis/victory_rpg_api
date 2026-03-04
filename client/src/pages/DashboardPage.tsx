@@ -441,56 +441,83 @@ const DashboardPage: React.FC = () => {
 
                         <button
                             onClick={() => setShowDetails(!showDetails)}
-                            className="w-full py-2 bg-slate-950 hover:bg-slate-800 text-slate-500 hover:text-amber-500 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all border border-slate-800"
+                            className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 text-slate-400 hover:text-amber-500 text-xs font-bold uppercase tracking-widest rounded-xl transition-all border border-slate-700/50 flex items-center justify-center cursor-pointer shadow-sm hover:shadow-md"
                         >
-                            {showDetails ? 'Свернуть' : 'Развернуть'}
+                            {showDetails ? 'Свернуть характеристики' : 'Развернуть характеристики'}
                         </button>
 
-                        <div className="pt-6 border-t border-slate-800 grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="pt-6 border-t border-slate-800 flex flex-col gap-3">
                             {[
-                                { label: 'Сила', key: 'strength', color: 'text-amber-500', bgHover: 'hover:border-amber-700' },
-                                { label: 'Ловкость', key: 'agility', color: 'text-green-500', bgHover: 'hover:border-green-700' },
-                                { label: 'Стойкость', key: 'constitution', color: 'text-red-500', bgHover: 'hover:border-red-700' },
-                                { label: 'Интеллект', key: 'intelligence', color: 'text-blue-500', bgHover: 'hover:border-blue-700' },
-                                { label: 'Удача', key: 'luck', color: 'text-yellow-500', bgHover: 'hover:border-yellow-700' },
+                                { label: 'Сила', key: 'strength', color: 'text-amber-500', bgHover: 'hover:border-amber-700', desc: 'Увеличивает физ. урон и силу атаки' },
+                                { label: 'Ловкость', key: 'agility', color: 'text-green-500', bgHover: 'hover:border-green-700', desc: 'Меткость, уклонение и урон лучника' },
+                                { label: 'Стойкость', key: 'constitution', color: 'text-red-500', bgHover: 'hover:border-red-700', desc: 'Макс. здоровье и его регенерация' },
+                                { label: 'Интеллект', key: 'intelligence', color: 'text-blue-500', bgHover: 'hover:border-blue-700', desc: 'Маг. урон, запас маны и её реген' },
+                                { label: 'Удача', key: 'luck', color: 'text-yellow-500', bgHover: 'hover:border-yellow-700', desc: 'Крит. шанс и удача при поиске лута' },
                             ].map((s) => {
-                                // Используем итоговое значение из расчетных стат (stats)
-                                // и базовое из модели персонажа (char) для показа разницы
-                                const modifiedValue = (stats as any)[s.key];
+                                // Итоговое значение от сервера
+                                const finalValue = (stats as any)[s.key] || 0;
+                                // Базовое значение из БД (обычно 5)
                                 const baseValue = (char as any)[s.key] || 0;
-                                const addedValue = (char as any)[`${s.key}_added`] || 0;
-                                const diff = modifiedValue !== undefined ? modifiedValue - (baseValue + addedValue) : 0;
-                                const displayValue = modifiedValue !== undefined ? modifiedValue : baseValue;
+                                // Влитые очки характеристик (от уровня)
+                                const levelPoints = (char as any)[`${s.key}_added`] || 0;
+
+                                // Определяем модификатор класса (чтобы понять, рисовать ли стрелочку)
+                                let classMod = 0; // 0 = нет бонуса, 10 = +10%, -10 = -10%
+                                const charClass = char.class?.toLowerCase();
+                                if (charClass === 'воин') {
+                                    if (s.key === 'strength') classMod = 10;
+                                    if (s.key === 'intelligence') classMod = -10;
+                                } else if (charClass === 'лучник') {
+                                    if (s.key === 'agility') classMod = 10;
+                                    if (s.key === 'strength') classMod = -10;
+                                } else if (charClass === 'маг') {
+                                    if (s.key === 'intelligence') classMod = 10;
+                                    if (s.key === 'constitution') classMod = -10;
+                                }
+
+                                // Расчитываем часть от экипировки
+                                // Формула на сервере: (base + added) * (1 + mod/100) + equip
+                                const valueWithClass = (baseValue + levelPoints) * (1 + classMod / 100);
+                                const equipBonus = Math.round(finalValue - valueWithClass);
+
                                 const isDistributing = distributing === s.key;
 
                                 return (
-                                    <div key={s.key} className={`bg-slate-950 p-3 rounded-xl border border-slate-800 text-center relative group/stat transition-all ${statPoints > 0 ? s.bgHover : ''}`}>
-                                        <div className={`text-[10px] uppercase font-bold text-slate-500 mb-1`}>{s.label}</div>
-                                        <div className="text-xl font-bold text-slate-100 flex items-center justify-center gap-1">
-                                            {displayValue}
-                                            {diff !== 0 && (
-                                                <span className={`text-[10px] ${diff > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                    {diff > 0 ? '↑' : '↓'}
-                                                </span>
-                                            )}
+                                    <div key={s.key} className={`bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between relative group/stat transition-all ${statPoints > 0 ? s.bgHover : ''}`}>
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-[10px] uppercase font-black tracking-wider ${s.color}`}>{s.label}</span>
+                                                <div className="text-xl font-bold text-slate-100 flex items-center gap-1.5">
+                                                    {Math.round(finalValue)}
+                                                    {classMod !== 0 && (
+                                                        <span className={`text-xs ${classMod > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                            {classMod > 0 ? '↑' : '↓'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 leading-tight">
+                                                {s.desc}
+                                            </div>
+                                            <div className="flex gap-3 mt-1.5">
+                                                <div className="text-[9px] text-slate-600">
+                                                    Очки: <span className="text-slate-400">+{levelPoints}</span>
+                                                </div>
+                                                {equipBonus !== 0 && (
+                                                    <div className="text-[9px] text-slate-600">
+                                                        Экип: <span className="text-green-600">+{equipBonus}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        {addedValue > 0 && (
-                                            <div className="text-[9px] text-slate-600 mt-0.5">
-                                                база {baseValue} + <span className={s.color}>{addedValue}</span>
-                                            </div>
-                                        )}
-                                        {diff !== 0 && (
-                                            <div className="absolute -top-2 -right-2 bg-slate-800 text-[8px] px-1.5 py-0.5 rounded border border-slate-700 opacity-0 group-hover/stat:opacity-100 transition-opacity">
-                                                {diff > 0 ? '+' : ''}{diff} (экип/класс)
-                                            </div>
-                                        )}
+
                                         {statPoints > 0 && (
                                             <button
                                                 onClick={() => handleDistributeStat(s.key)}
                                                 disabled={isDistributing}
-                                                className={`absolute -top-2 -left-2 w-6 h-6 bg-amber-600 hover:bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg shadow-amber-900/40 transition-all hover:scale-110 ${isDistributing ? 'animate-spin' : 'animate-bounce'}`}
+                                                className={`w-8 h-8 bg-amber-600 hover:bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg shadow-amber-900/40 transition-all hover:scale-110 active:scale-95 ${isDistributing ? 'animate-spin' : 'animate-bounce'}`}
                                             >
-                                                {isDistributing ? <Loader2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                                                {isDistributing ? <Loader2 className="w-4 h-4" /> : <Plus className="w-3 h-3" />}
                                             </button>
                                         )}
                                     </div>

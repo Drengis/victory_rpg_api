@@ -12,15 +12,23 @@ class ShopSeeder extends Seeder
      */
     public function run(): void
     {
-        $starterShop = \App\Models\Shop::updateOrCreate(
-            ['name' => 'Лавка для новичков'],
-            ['description' => 'Здесь можно купить базовое снаряжение для первых приключений.']
-        );
+        // Очищаем существующие магазины и товары
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        \App\Models\Shop::truncate();
+        \Illuminate\Support\Facades\DB::table('shop_items')->truncate();
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        $midShop = \App\Models\Shop::updateOrCreate(
-            ['name' => 'Снаряжение бывалого'],
-            ['description' => 'Отличное снаряжение для тех, кто готов спускаться глубже.']
-        );
+        $starterShop = \App\Models\Shop::create([
+            'name' => 'Лавка для новичков',
+            'description' => 'Здесь можно купить базовое снаряжение для первых приключений.',
+            'min_level' => 1
+        ]);
+
+        $midShop = \App\Models\Shop::create([
+            'name' => 'Снаряжение бывалого',
+            'description' => 'Отличное снаряжение для тех, кто готов спускаться глубже. Доступно с 5 уровня.',
+            'min_level' => 5
+        ]);
 
         // Начальные предметы (цена до 50)
         $starterItems = \App\Models\Item::where('quality', 1)
@@ -29,9 +37,7 @@ class ShopSeeder extends Seeder
             ->get();
 
         foreach ($starterItems as $item) {
-            $starterShop->items()->syncWithoutDetaching([
-                $item->id => ['ilevel' => 1]
-            ]);
+            $starterShop->items()->attach($item->id, ['ilevel' => 1]);
         }
 
         // Средние предметы (цена 50 и выше)
@@ -41,15 +47,13 @@ class ShopSeeder extends Seeder
             ->get();
 
         foreach ($midItems as $item) {
-            $midShop->items()->syncWithoutDetaching([
-                $item->id => ['ilevel' => 1] // Уровень продаваемого предмета можно настроить
+            // Для "Лавки бывалого" делаем цену x3
+            $priceOverride = $item->base_price * 3;
+            
+            $midShop->items()->attach($item->id, [
+                'ilevel' => 1,
+                'price_override' => $priceOverride
             ]);
-    
-    
         }
-
-        // Удаляем старые магазины, если они были
-        $validShopIds = [$starterShop->id, $midShop->id];
-        \App\Models\Shop::whereNotIn('id', $validShopIds)->delete();
     }
 }

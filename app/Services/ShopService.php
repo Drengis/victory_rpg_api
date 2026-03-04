@@ -89,6 +89,10 @@ class ShopService
             throw new Exception("Этот товар не продается в данном магазине.");
         }
 
+        if ($character->level < $shop->min_level) {
+            throw new Exception("Ваш уровень слишком мал для этого магазина. Требуется уровень: {$shop->min_level}");
+        }
+
         $ilevel = $shopItem->pivot->ilevel;
         $pricePerUnit = $shopItem->pivot->price_override ?? $item->calculatePrice($ilevel);
         $totalCost = $pricePerUnit * $quantity;

@@ -58,8 +58,52 @@ class QuestSeeder extends Seeder
             'description' => 'Ваш путь только начинается. Достигните 5-го уровня.',
             'type' => 'level',
             'target_value' => 5,
-            'requirements' => ['level' => 4],
+            'requirements' => ['level' => 1],
             'rewards' => ['gold' => 150],
+        ]);
+        $q6 = \App\Models\Quest::create([
+            'name' => 'Проблема с грызунами',
+            'description' => 'Некоторые жители жалуются на расплодившихся крыс. Принесите им доказательства охоты.',
+            'type' => 'loot',
+            'target_value' => 5,
+            'requirements' => ['level' => 1, 'quest_id' => $q1->id, 'item_id' => 39], // Хвост крысы (ID 39)
+            'rewards' => ['gold' => 40, 'xp' => 40],
+        ]);
+
+        $q7 = \App\Models\Quest::create([
+            'name' => 'Зачистка лагеря гоблинов',
+            'description' => 'Гоблины стали слишком смелыми. Принесите трофеи, чтобы доказать свою доблесть.',
+            'type' => 'loot',
+            'target_value' => 5,
+            'requirements' => ['level' => 3, 'item_id' => 40], // Ухо гоблина (ID 40)
+            'rewards' => ['gold' => 80, 'xp' => 150, 'random_mid_gear' => true],
+        ]);
+
+        $q8 = \App\Models\Quest::create([
+            'name' => 'Некроманты не дремлют',
+            'description' => 'Из-под земли восстают скелеты. Кто-то за это платит...',
+            'type' => 'loot',
+            'target_value' => 10,
+            'requirements' => ['level' => 5, 'item_id' => 41], // Кость скелета (ID 41)
+            'rewards' => ['gold' => 100, 'xp' => 300, 'random_mid_gear' => true],
+        ]);
+
+        $q9 = \App\Models\Quest::create([
+            'name' => 'Орочья угроза',
+            'description' => 'Орки приближаются! Уничтожьте их разведчиков.',
+            'type' => 'loot',
+            'target_value' => 3,
+            'requirements' => ['level' => 7, 'item_id' => 42], // Клык орка (ID 42)
+            'rewards' => ['gold' => 220, 'xp' => 500, 'stat_points' => 1],
+        ]);
+
+        $q10 = \App\Models\Quest::create([
+            'name' => 'Дератизация: Профи',
+            'description' => 'Крысы никуда не исчезли. Нужно радикальное решение проблемы.',
+            'type' => 'loot',
+            'target_value' => 15,
+            'requirements' => ['level' => 3, 'quest_id' => $q6->id, 'item_id' => 39],
+            'rewards' => ['gold' => 100, 'random_mid_gear' => true],
         ]);
     }
 }

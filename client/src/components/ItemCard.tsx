@@ -9,6 +9,7 @@ interface ItemCardProps {
     hideActions?: boolean;
     playerClass?: string;
     isEquipped?: boolean; // Добавлено свойство для подсветки экипированных вещей
+    quantity?: number; // Для стакающихся предметов
 }
 
 const qualityNames: Record<number, string> = {
@@ -19,7 +20,7 @@ const qualityNames: Record<number, string> = {
     5: 'Легендарный',
 };
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions = false, playerClass, isEquipped = false }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions = false, playerClass, isEquipped = false, quantity }) => {
     const effectiveQuality = quality ?? item.quality;
     const isWrongClass = item.required_class && playerClass && item.required_class.toLowerCase() !== playerClass.toLowerCase();
 
@@ -65,9 +66,14 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, ilevel, quality, hideActions 
             {/* Основная инфа */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center border transition-colors ${isWrongClass ? 'bg-red-900/20 border-red-600' : 'bg-slate-900 border-current opacity-60'
+                    <div className={`relative w-10 h-10 rounded-lg flex items-center justify-center border transition-colors ${isWrongClass ? 'bg-red-900/20 border-red-600' : 'bg-slate-900 border-current opacity-60'
                         }`}>
                         {getTypeIcon(item.type)}
+                        {quantity && quantity > 1 && (
+                            <div className="absolute -top-2 -right-2 bg-amber-500 text-slate-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md ring-2 ring-slate-900 z-10">
+                                {quantity < 100 ? `x${quantity}` : '99+'}
+                            </div>
+                        )}
                     </div>
 
                     <div>

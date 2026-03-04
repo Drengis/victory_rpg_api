@@ -127,6 +127,17 @@ class QuestService extends BaseService
                 $updated = true;
             }
 
+            // Новый тип: Сбор предметов (loot)
+            if ($quest->type === 'loot') {
+                $itemId = $quest->requirements['item_id'] ?? null;
+                if ($itemId) {
+                    $pivot->current_value = $character->items()
+                        ->where('item_id', $itemId)
+                        ->sum('quantity');
+                    $updated = true;
+                }
+            }
+
             // Если прогресс достиг цели, ставим статус ready
             if ($pivot->current_value >= $quest->target_value) {
                 $pivot->status = 'ready';
@@ -157,6 +168,31 @@ class QuestService extends BaseService
             $rewards = $quest->rewards;
             $result = [];
 
+            // Если это квест на сбор предметов (loot), изымаем их
+            if ($quest->type === 'loot') {
+                $itemId = $quest->requirements['item_id'] ?? null;
+                $needed = $quest->target_value;
+                if ($itemId) {
+                    $items = \App\Models\CharacterItem::where('character_id', $character->id)
+                        ->where('item_id', $itemId)
+                        ->orderBy('quantity', 'asc')
+                        ->get();
+                    
+                    $remaining = $needed;
+                    foreach ($items as $charItem) {
+                        if ($remaining <= 0) break;
+                        $take = min($charItem->quantity, $remaining);
+                        if ($charItem->quantity > $take) {
+                            $charItem->quantity -= $take;
+                            $charItem->save();
+                        } else {
+                            $charItem->delete();
+                        }
+                        $remaining -= $take;
+                    }
+                }
+            }
+
             // 1. Золото
             if (isset($rewards['gold'])) {
                 $character->gold += $rewards['gold'];
@@ -165,7 +201,6 @@ class QuestService extends BaseService
 
             // 2. Опыт
             if (isset($rewards['xp'])) {
-                // Используем CharacterService для корректного начисления опыта и LevelUp
                 app(CharacterService::class)->addExperience($character, $rewards['xp']);
                 $result['xp'] = $rewards['xp'];
             }
@@ -176,12 +211,61 @@ class QuestService extends BaseService
                 $result['stat_points'] = $rewards['stat_points'];
             }
 
-            // 4. Предметы (пока простая выдача по ID)
+            // 4. Предметы (по ID)
             if (isset($rewards['items']) && is_array($rewards['items'])) {
                 foreach ($rewards['items'] as $itemId) {
-                    app(ShopService::class)->addItemToCharacter($character, \App\Models\Item::find($itemId), 1);
+                    $item = \App\Models\Item::find($itemId);
+                    if ($item) {
+                        app(CharacterService::class)->addItemToCharacter($character, $item, 1);
+                    }
                 }
                 $result['items_count'] = count($rewards['items']);
+            }
+
+            // 5. Случайное снаряжение (random_gear)
+            if (isset($rewards['random_gear'])) {
+                $quality = $rewards['random_gear']['quality'] ?? 1;
+                $ilevel = $rewards['random_gear']['ilevel'] ?? $character->level;
+                
+                $query = \App\Models\Item::where('quality', $quality);
+                
+                // Фильтр по классу
+                $charClass = mb_strtolower($character->class);
+                $query->where(function($q) use ($charClass) {
+                    $q->whereNull('required_class')
+                      ->orWhere('required_class', $charClass);
+                });
+                
+                // Только снаряжение
+                $query->whereIn('type', ['weapon', 'head', 'chest', 'hands', 'legs', 'feet', 'neck', 'ring', 'belt', 'trinket']);
+                
+                $randomItem = $query->inRandomOrder()->first();
+                
+                if ($randomItem) {
+                    app(CharacterService::class)->addItemToCharacter($character, $randomItem, 1, $ilevel);
+                    $result['random_item'] = $randomItem->name;
+                }
+            }
+
+            // 6. Случайное среднее снаряжение (random_mid_gear)
+            if (isset($rewards['random_mid_gear'])) {
+                // Среднее снаряжение имеет ID с 17 по 38 в сидере
+                $query = \App\Models\Item::whereBetween('id', [17, 38]);
+                
+                // Фильтр по классу (только для оружия/брони, где есть класс)
+                $charClass = mb_strtolower($character->class);
+                $query->where(function($q) use ($charClass) {
+                    $q->whereNull('required_class')
+                      ->orWhere('required_class', $charClass);
+                });
+                
+                $randomItem = $query->inRandomOrder()->first();
+                
+                if ($randomItem) {
+                    // Выдаем предмет с илевлом текущего уровня персонажа
+                    app(CharacterService::class)->addItemToCharacter($character, $randomItem, 1, $character->level);
+                    $result['random_mid_item'] = $randomItem->name;
+                }
             }
 
             $character->save();

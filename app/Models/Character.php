@@ -10,13 +10,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class Character extends Model
 {
     protected $fillable = [
-        'user_id',
         'name',
         'class',
-        'level',
-        'experience',
-        'gold',
-        'stat_points',
         'strength',
         'agility',
         'constitution',
@@ -29,6 +24,15 @@ class Character extends Model
         'luck_added',
         'dungeon_depth',
         'max_dungeon_depth',
+    ];
+
+    protected $guarded = [
+        'id',
+        'user_id',
+        'level',
+        'experience',
+        'gold',
+        'stat_points',
     ];
 
     protected $attributes = [

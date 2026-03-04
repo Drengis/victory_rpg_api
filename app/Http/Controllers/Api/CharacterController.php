@@ -78,17 +78,17 @@ class CharacterController extends BaseController
             return $this->errorResponse('Необходима авторизация', 401);
         }
 
-        $request->merge(['user_id' => auth()->id()]);
-        $response = parent::store($request);
+        $validatedData = $this->validate($request, $this->getValidationRules());
+        
+        // Создаем персонажа вручную, так как user_id защищен (guarded)
+        $character = new Character($validatedData);
+        $character->user_id = auth()->id();
+        $character->save();
         
         // Подгружаем статы для ответа
-        if ($response->getStatusCode() === 201) {
-            $data = $response->getData();
-            $character = Character::with(['stats', 'dynamicStats'])->find($data->data->id);
-            return $this->createdResponse($character);
-        }
-
-        return $response;
+        $character->load(['stats', 'dynamicStats']);
+        
+        return $this->createdResponse($character);
     }
 
     /**

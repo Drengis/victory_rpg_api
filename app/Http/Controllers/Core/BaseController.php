@@ -81,10 +81,17 @@ abstract class BaseController extends LaravelController
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $validatedData = $this->validate($request, $this->getUpdateValidationRules($id));
-        $item = $this->getService()->update($id, $validatedData);
+        $item = $this->getService()->getById($id);
+        
+        // Базовая проверка владения: если у модели есть user_id, он должен быть наш
+        if (isset($item->user_id) && $item->user_id !== auth()->id()) {
+            return $this->errorResponse('У вас нет прав для редактирования этого ресурса', 403);
+        }
 
-        return $this->successResponse($item);
+        $validatedData = $this->validate($request, $this->getUpdateValidationRules($id));
+        $updatedItem = $this->getService()->update($id, $validatedData);
+
+        return $this->successResponse($updatedItem);
     }
 
     /**
@@ -94,6 +101,12 @@ abstract class BaseController extends LaravelController
      */
     public function destroy(int $id): JsonResponse
     {
+        $item = $this->getService()->getById($id);
+
+        if (isset($item->user_id) && $item->user_id !== auth()->id()) {
+            return $this->errorResponse('У вас нет прав для удаления этого ресурса', 403);
+        }
+
         $this->getService()->delete($id);
 
         return $this->noContentResponse();
