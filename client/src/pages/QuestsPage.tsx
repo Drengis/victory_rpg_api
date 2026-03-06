@@ -11,7 +11,9 @@ import {
     Zap,
     Target,
     Map,
-    ShieldAlert
+    ShieldAlert,
+    Sword,
+    Package
 } from 'lucide-react';
 import api from '../api/axios';
 import { useGameStore } from '../store/gameStore';
@@ -21,6 +23,8 @@ interface QuestReward {
     xp?: number;
     stat_points?: number;
     items?: number[];
+    random_gear?: { quality?: number; ilevel?: number };
+    random_mid_gear?: boolean;
 }
 
 interface Quest {
@@ -118,6 +122,7 @@ const QuestsPage: React.FC = () => {
             case 'depth': return <Map className="w-5 h-5" />;
             case 'gold': return <Coins className="w-5 h-5" />;
             case 'level': return <Zap className="w-5 h-5" />;
+            case 'loot': return <Package className="w-5 h-5" />;
             default: return <ScrollText className="w-5 h-5" />;
         }
     };
@@ -202,7 +207,7 @@ const QuestsPage: React.FC = () => {
                                         {!isCompleted && (
                                             <div className="space-y-2 mb-4">
                                                 <div className="flex justify-between text-xs font-medium text-slate-500">
-                                                    <span>Условие: {quest.type === 'kills' ? 'Убить' : quest.type === 'depth' ? 'Достичь глубины' : quest.type === 'gold' ? 'Собрать золото' : 'Уровень'}</span>
+                                                    <span>Условие: {quest.type === 'kills' ? 'Убить' : quest.type === 'depth' ? 'Достичь глубины' : quest.type === 'gold' ? 'Собрать золото' : quest.type === 'loot' ? 'Собрать предметы' : 'Уровень'}</span>
                                                     <span className={isReady ? 'text-amber-400' : 'text-slate-300'}>
                                                         {quest.pivot.current_value} / {quest.target_value}
                                                     </span>
@@ -234,6 +239,18 @@ const QuestsPage: React.FC = () => {
                                                 <div className="flex items-center gap-1.5 text-purple-400 text-sm font-bold bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
                                                     <ShieldAlert className="w-4 h-4" />
                                                     <span>+{quest.rewards.stat_points} Очко</span>
+                                                </div>
+                                            )}
+                                            {quest.rewards.random_mid_gear && (
+                                                <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                                                    <Sword className="w-4 h-4" />
+                                                    <span>Снаряжение</span>
+                                                </div>
+                                            )}
+                                            {quest.rewards.random_gear && (
+                                                <div className="flex items-center gap-1.5 text-orange-400 text-sm font-bold bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+                                                    <Sword className="w-4 h-4" />
+                                                    <span>Редкое снаряжение</span>
                                                 </div>
                                             )}
                                         </div>

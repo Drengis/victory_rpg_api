@@ -95,6 +95,7 @@ class AbilityService
         $dynamic = $character->dynamicStats;
         $effectValue = $ability->calculateEffect($totalStats);
         $damageDealt = 0;
+        $appliedEffects = [];
         
         // Применение эффекта
         switch ($ability->effect_type) {
@@ -116,6 +117,49 @@ class AbilityService
                     if ($participant) {
                         $damageDealt = round($effectValue);
                         $participant->current_hp = max(0, $participant->current_hp - $damageDealt);
+                        
+                        if (!empty($ability->effects)) {
+                            $targetEffects = $participant->effects ?? [];
+                            foreach ($ability->effects as $effect) {
+                                if (rand(1, 100) <= ($effect['chance'] ?? 100)) {
+                                    $effectType = $effect['type'];
+                                    $isDot = in_array($effectType, ['bleed', 'poison', 'burn']);
+                                    $found = false;
+
+                                    // Для DOT-эффектов мы стакаем (складываем) длительности
+                                    if ($isDot) {
+                                        foreach ($targetEffects as &$existingEffect) {
+                                            if ($existingEffect['type'] === $effectType) {
+                                                $existingEffect['duration'] += $effect['duration'];
+                                                $found = true;
+                                                break;
+                                            }
+                                        }
+                                        unset($existingEffect); // разрываем ссылку
+                                    }
+
+                                    if (!$found) {
+                                        // Очищаем служебный параметр chance при сохранении
+                                        $effectToSave = [
+                                            'type' => $effectType,
+                                            'duration' => $effect['duration']
+                                        ];
+                                        // value используется только для других эффектов (weakness, etc)
+                                        if (!$isDot && isset($effect['value'])) {
+                                            $effectToSave['value'] = $effect['value'];
+                                        }
+                                        $targetEffects[] = $effectToSave;
+                                    }
+                                    
+                                    $appliedEffects[] = [
+                                        'type' => $effectType,
+                                        'duration' => $effect['duration']
+                                    ];
+                                }
+                            }
+                            $participant->effects = $targetEffects;
+                        }
+                        
                         $participant->save();
                     }
                 }
@@ -138,6 +182,7 @@ class AbilityService
             'ability_name' => $ability->ability_name,
             'effect_value' => $effectValue,
             'damage_dealt' => $damageDealt,
+            'applied_effects' => $appliedEffects,
             'mp_spent' => $ability->mp_cost,
             'mp_remaining' => $dynamic->current_mp,
         ];

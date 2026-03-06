@@ -93,6 +93,12 @@ export interface CharacterStats {
     armor: number;
 }
 
+export interface StatusEffect {
+    type: string;
+    duration: number;
+    value?: number;
+}
+
 export interface CharacterDynamicStats {
     current_hp: number;
     current_mp: number;
@@ -103,6 +109,7 @@ export interface CharacterDynamicStats {
     temp_evasion?: number;
     temp_evasion_duration?: number;
     enemies_defeated_at_depth: number;
+    effects?: StatusEffect[];
 }
 
 export interface Enemy {
@@ -136,6 +143,7 @@ export interface CombatParticipant {
     level: number;
     position: number;
     enemy: Enemy;
+    effects?: StatusEffect[];
 }
 
 export interface ClassAbility {

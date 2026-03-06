@@ -18,7 +18,9 @@ class ClassAbility extends Model
         'duration',
         'effect_type',
         'effect_formula',
+        'effect_formula',
         'description',
+        'effects',
     ];
 
     protected $casts = [
@@ -26,7 +28,9 @@ class ClassAbility extends Model
         'gold_cost' => 'integer',
         'max_uses_per_combat' => 'integer',
         'cooldown_turns' => 'integer',
+        'cooldown_turns' => 'integer',
         'duration' => 'integer',
+        'effects' => 'array',
     ];
 
     /**

@@ -88,8 +88,22 @@ class CombatService
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        return DB::transaction(function () use ($combat, $participantId) {
-            $character = $combat->character;
+        $character = $combat->character;
+        $dynamic = $character->dynamicStats;
+        
+        // Проверка эффектов в начале хода
+        $startEffects = $this->processTurnStartEffects($dynamic, 'Вы');
+        if ($startEffects['skip_turn']) {
+            $enemyLogs = $this->endPlayerTurn($combat);
+            return [
+                'action' => 'attack',
+                'damage' => 0,
+                'logs' => array_merge($startEffects['logs'], $enemyLogs),
+                'status' => $combat->status,
+            ];
+        }
+
+        return DB::transaction(function () use ($combat, $participantId, $character, $dynamic) {
             $stats = $character->stats;
             $participant = CombatParticipant::findOrFail($participantId);
             $enemy = $participant->enemy;
@@ -149,6 +163,13 @@ class CombatService
             if ($isCrit) {
                 $baseDamage *= 2;
             }
+
+            // Учитываем модификаторы эффектов (Resistance, Weakness, Empowerment)
+            $playerModifiers = $this->getEffectModifiers($dynamic->effects ?? []);
+            $enemyModifiers = $this->getEffectModifiers($participant->effects ?? []);
+
+            $baseDamage = $baseDamage * $playerModifiers['damage_dealt_mult'];
+            $baseDamage = $baseDamage * $enemyModifiers['damage_taken_mult'];
 
             // Применяем броню врага
             $enemyArmor = $enemyStats['armor'] ?? 0;
@@ -245,8 +266,21 @@ class CombatService
             throw new \Exception("Сейчас не ваш ход.");
         }
 
-        $result = DB::transaction(function () use ($combat, $abilityId, $targetId) {
-            $character = $combat->character;
+        $character = $combat->character;
+        $dynamic = $character->dynamicStats;
+
+        // Проверка эффектов в начале хода
+        $startEffects = $this->processTurnStartEffects($dynamic, 'Вы');
+        if ($startEffects['skip_turn']) {
+            $enemyLogs = $this->endPlayerTurn($combat);
+            return [
+                'action' => 'ability',
+                'logs' => array_merge($startEffects['logs'], $enemyLogs),
+                'status' => $combat->status,
+            ];
+        }
+
+        $result = DB::transaction(function () use ($combat, $abilityId, $targetId, $character, $dynamic) {
             $ability = \App\Models\ClassAbility::find($abilityId);
 
             if (!$ability) {
@@ -276,7 +310,25 @@ class CombatService
             if ($ability->effect_type === 'deal_damage') {
                 $target = $combat->participants()->find($targetId);
                 $enemyName = $target ? $target->enemy->name : "врага";
+
+                // Учитываем модификаторы эффектов
+                if ($target) {
+                    $playerModifiers = $this->getEffectModifiers($dynamic->effects ?? []);
+                    $enemyModifiers = $this->getEffectModifiers($target->effects ?? []);
+                    $useResult['damage_dealt'] = round($useResult['damage_dealt'] * $playerModifiers['damage_dealt_mult'] * $enemyModifiers['damage_taken_mult']);
+                    $useResult['damage_dealt'] = max(1, $useResult['damage_dealt']);
+                }
+
                 $log .= "нанесено {$useResult['damage_dealt']} урона {$enemyName}";
+
+                if (!empty($useResult['applied_effects'])) {
+                    $effectNames = [];
+                    $typeNames = ['stun' => '💢 оглушение', 'bleed' => '🩸 кровотечение', 'burn' => '🔥 горение', 'poison' => '☠️ яд'];
+                    foreach ($useResult['applied_effects'] as $effect) {
+                        $effectNames[] = $typeNames[$effect['type']] ?? $effect['type'];
+                    }
+                    $log .= " (Наложено: " . implode(', ', $effectNames) . ")";
+                }
 
                 // Проверяем смерть врага
                 if ($target && $target->current_hp <= 0) {
@@ -371,6 +423,19 @@ class CombatService
         }
 
         $character = $combat->character;
+        $dynamic = $character->dynamicStats;
+
+        // Проверка эффектов в начале хода
+        $startEffects = $this->processTurnStartEffects($dynamic, 'Вы');
+        if ($startEffects['skip_turn']) {
+            $enemyLogs = $this->endPlayerTurn($combat);
+            return [
+                'success' => false,
+                'logs' => array_merge($startEffects['logs'], $enemyLogs),
+                'status' => $combat->status,
+            ];
+        }
+
         $charStats = $character->stats;
 
         // 1. Находим самого "быстрого" врага
@@ -416,8 +481,21 @@ class CombatService
         // Начисляем регенерацию за раунд
         $this->characterService->applyCombatRoundRegen($combat->character);
 
+        // Обработка DOT-эффектов в конце хода игрока
+        $dynamic = $combat->character->dynamicStats;
+        $endEffects = $this->processTurnEndEffects($dynamic, 'Вы');
+        
+        if ($endEffects['is_dead']) {
+            $dynamic->current_hp = 1;
+            $dynamic->last_combat_log = implode("\n", $endEffects['logs']) . "\n💀 Вы погибли от эффектов...";
+            $dynamic->save();
+            $this->finishCombat($combat, 'lost');
+            return $endEffects['logs'];
+        }
+
         $combat->update(['current_turn' => 'enemies']);
-        return $this->processEnemiesTurn($combat);
+        $enemyLogs = $this->processEnemiesTurn($combat);
+        return array_merge($endEffects['logs'], $enemyLogs);
     }
 
     /**
@@ -432,6 +510,33 @@ class CombatService
 
         foreach ($combat->participants as $participant) {
             $enemy = $participant->enemy;
+
+            // Проверка эффектов в начале хода врага
+            $startEffects = $this->processTurnStartEffects($participant, $enemy->name);
+            if ($startEffects['skip_turn']) {
+                $logs = array_merge($logs, $startEffects['logs']);
+                
+                // Даже если пропускает ход, применяем DOT-эффекты в конце хода
+                $endEffects = $this->processTurnEndEffects($participant, $enemy->name);
+                $logs = array_merge($logs, $endEffects['logs']);
+                
+                if ($endEffects['is_dead']) {
+                    $rewards = $this->rewardService->rewardCharacter($character, $enemy, $participant->level);
+                    $participant->delete();
+                    // Чтобы не усложнять, если умер от DOT-а в свой ход, просто удаляем
+                    $combat->gold_reward += $rewards['gold'];
+                    $combat->experience_reward += $rewards['experience'];
+                    $combat->save();
+                    $logs[] = "☠️ {$enemy->name} погиб от эффектов!";
+                }
+                
+                continue; // Переход к следующему врагу
+            }
+
+            if (!empty($startEffects['logs'])) {
+                $logs = array_merge($logs, $startEffects['logs']);
+            }
+
             $enemyStats = $this->enemyService->calculateFinalStats($enemy, $participant->level);
 
             // 1. Попадание (Меткость врага vs Уклонение игрока)
@@ -463,6 +568,13 @@ class CombatService
             if ($isCrit) {
                 $baseDamage *= 1.5; // Криты мобов чуть слабее (1.5x вместо 2x)
             }
+
+            // Модификаторы эффектов
+            $enemyModifiers = $this->getEffectModifiers($participant->effects ?? []);
+            $playerModifiers = $this->getEffectModifiers($dynamic->effects ?? []);
+
+            $baseDamage = $baseDamage * $enemyModifiers['damage_dealt_mult'];
+            $baseDamage = $baseDamage * $playerModifiers['damage_taken_mult'];
 
             $totalArmor = $charStats->armor + $dynamic->temp_armor;
             $finalDamage = max(0, round($baseDamage - $totalArmor));
@@ -514,6 +626,22 @@ class CombatService
                     'max_hp' => $participant->max_hp,
                 ]);
             }
+            $participant->save();
+
+            // Эффекты в конце хода врага (DOT)
+            $endEffects = $this->processTurnEndEffects($participant, $enemy->name);
+            if (!empty($endEffects['logs'])) {
+                $logs = array_merge($logs, $endEffects['logs']);
+            }
+
+            if ($endEffects['is_dead'] && $participant->current_hp <= 0) { // Проверка на смерть
+                $rewards = $this->rewardService->rewardCharacter($character, $enemy, $participant->level);
+                $participant->delete();
+                $combat->gold_reward += $rewards['gold'];
+                $combat->experience_reward += $rewards['experience'];
+                $combat->save();
+                $logs[] = "☠️ {$enemy->name} погиб от эффектов!";
+            }
         }
 
         // Снижение длительности временных эффектов
@@ -557,7 +685,105 @@ class CombatService
             'is_in_combat' => false,
             'barrier_hp' => 0,
             'temp_armor' => 0,
-            'temp_evasion' => 0
+            'temp_evasion' => 0,
+            'effects' => [] // Очищаем эффекты после боя
         ]);
+    }
+
+    /**
+     * Получить множители урона от эффектов
+     */
+    protected function getEffectModifiers(array $effects): array
+    {
+        $damageDealtMult = 1.0;
+        $damageTakenMult = 1.0;
+
+        foreach ($effects as $effect) {
+            $val = $effect['value'] ?? 0;
+            if ($effect['type'] === 'empowerment') {
+                $damageDealtMult += $val / 100;
+            } elseif ($effect['type'] === 'weakness') {
+                $damageDealtMult -= $val / 100;
+            } elseif ($effect['type'] === 'resistance') {
+                $damageTakenMult -= $val / 100;
+            }
+        }
+
+        // Не даем множителям стать отрицательными
+        $damageDealtMult = max(0, $damageDealtMult);
+        $damageTakenMult = max(0, $damageTakenMult);
+
+        return [
+            'damage_dealt_mult' => $damageDealtMult,
+            'damage_taken_mult' => $damageTakenMult,
+        ];
+    }
+
+    /**
+     * Проверка эффектов в начале хода (например, Оглушение)
+     */
+    protected function processTurnStartEffects($participant, string $name): array
+    {
+        $logs = [];
+        $skipTurn = false;
+        $effects = $participant->effects ?? [];
+
+        foreach ($effects as $effect) {
+            if ($effect['type'] === 'stun') {
+                $skipTurn = true;
+                $logs[] = "💫 {$name} оглушен(а) и пропускает ход!";
+                break;
+            }
+        }
+
+        return ['skip_turn' => $skipTurn, 'logs' => $logs];
+    }
+
+    /**
+     * Применение DOT урона и уменьшение длительности в конце хода
+     */
+    protected function processTurnEndEffects($participant, string $name): array
+    {
+        $logs = [];
+        $isDead = false;
+        $effects = $participant->effects ?? [];
+        $newEffects = [];
+        $hasChanges = false;
+
+        foreach ($effects as $effect) {
+            // Флэтовые уроны (урон = текущей длительности)
+            if (in_array($effect['type'], ['bleed', 'poison', 'burn'])) {
+                $damage = $effect['duration'];
+                if ($damage > 0) {
+                    $participant->current_hp -= $damage;
+                    
+                    $emoji = $effect['type'] === 'bleed' ? '🩸' : ($effect['type'] === 'poison' ? '☠️' : '🔥');
+                    $typeName = $effect['type'] === 'bleed' ? 'кровотечения' : ($effect['type'] === 'poison' ? 'яда' : 'горения');
+                    
+                    $logs[] = "{$emoji} {$name} получает {$damage} урона от {$typeName}.";
+                    $hasChanges = true;
+                    
+                    if ($participant->current_hp <= 0) {
+                        $isDead = true;
+                    }
+                }
+            }
+
+            // Уменьшаем длительность
+            $effect['duration']--;
+
+            if ($effect['duration'] > 0) {
+                $newEffects[] = $effect;
+            } else {
+                $hasChanges = true;
+            }
+        }
+
+        if ($hasChanges) {
+            $participant->effects = $newEffects;
+            $participant->save();
+        }
+
+        return ['is_dead' => $isDead, 'logs' => $logs];
     }
 }

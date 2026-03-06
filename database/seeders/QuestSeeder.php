@@ -17,6 +17,12 @@ class QuestSeeder extends Seeder
         \App\Models\Quest::truncate();
         \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
+        // Получаем реальные ID материалов по имени
+        $ratTailId = \App\Models\Item::where('name', 'Хвост крысы')->value('id');
+        $goblinEarId = \App\Models\Item::where('name', 'Ухо гоблина')->value('id');
+        $skeletonBoneId = \App\Models\Item::where('name', 'Кость скелета')->value('id');
+        $orcFangId = \App\Models\Item::where('name', 'Клык орка')->value('id');
+
         $q1 = \App\Models\Quest::create([
             'name' => 'Первые шаги',
             'description' => 'Мир полон опасностей. Убейте своих первых врагов, чтобы доказать свою силу.',
@@ -66,7 +72,7 @@ class QuestSeeder extends Seeder
             'description' => 'Некоторые жители жалуются на расплодившихся крыс. Принесите им доказательства охоты.',
             'type' => 'loot',
             'target_value' => 5,
-            'requirements' => ['level' => 1, 'quest_id' => $q1->id, 'item_id' => 39], // Хвост крысы (ID 39)
+            'requirements' => ['level' => 1, 'quest_id' => $q1->id, 'item_id' => $ratTailId],
             'rewards' => ['gold' => 40, 'xp' => 40],
         ]);
 
@@ -75,7 +81,7 @@ class QuestSeeder extends Seeder
             'description' => 'Гоблины стали слишком смелыми. Принесите трофеи, чтобы доказать свою доблесть.',
             'type' => 'loot',
             'target_value' => 5,
-            'requirements' => ['level' => 3, 'item_id' => 40], // Ухо гоблина (ID 40)
+            'requirements' => ['level' => 5, 'item_id' => $goblinEarId],
             'rewards' => ['gold' => 80, 'xp' => 150, 'random_mid_gear' => true],
         ]);
 
@@ -84,7 +90,7 @@ class QuestSeeder extends Seeder
             'description' => 'Из-под земли восстают скелеты. Кто-то за это платит...',
             'type' => 'loot',
             'target_value' => 10,
-            'requirements' => ['level' => 5, 'item_id' => 41], // Кость скелета (ID 41)
+            'requirements' => ['level' => 7, 'item_id' => $skeletonBoneId],
             'rewards' => ['gold' => 100, 'xp' => 300, 'random_mid_gear' => true],
         ]);
 
@@ -93,7 +99,7 @@ class QuestSeeder extends Seeder
             'description' => 'Орки приближаются! Уничтожьте их разведчиков.',
             'type' => 'loot',
             'target_value' => 3,
-            'requirements' => ['level' => 7, 'item_id' => 42], // Клык орка (ID 42)
+            'requirements' => ['level' => 10, 'item_id' => $orcFangId],
             'rewards' => ['gold' => 220, 'xp' => 500, 'stat_points' => 1],
         ]);
 
@@ -102,7 +108,7 @@ class QuestSeeder extends Seeder
             'description' => 'Крысы никуда не исчезли. Нужно радикальное решение проблемы.',
             'type' => 'loot',
             'target_value' => 15,
-            'requirements' => ['level' => 3, 'quest_id' => $q6->id, 'item_id' => 39],
+            'requirements' => ['level' => 3, 'quest_id' => $q6->id, 'item_id' => $ratTailId],
             'rewards' => ['gold' => 100, 'random_mid_gear' => true],
         ]);
     }

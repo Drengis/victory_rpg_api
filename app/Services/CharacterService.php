@@ -350,8 +350,7 @@ class CharacterService extends BaseService
                 return $this->refreshDynamicStats($character);
             }
 
-            // 1 раунд условно = 6 секунд (1/10 минуты)
-            $roundFactor = 6 / 60;
+            $roundFactor = 1;
 
             if ($dynamic->current_hp < $stats->max_hp) {
                 $regenHp = $stats->hp_regen * $roundFactor;

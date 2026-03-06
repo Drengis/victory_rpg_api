@@ -152,7 +152,7 @@ const CombatPage: React.FC = () => {
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
             {/* Battle Arena */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center py-12 relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start py-12 relative">
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
                     <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center border border-amber-500/20 blur-sm animate-pulse" />
                     <Sword className="w-12 h-12 text-amber-500/40 absolute left-4 top-4" />
@@ -172,6 +172,25 @@ const CombatPage: React.FC = () => {
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
                         <StatBar label="HP" current={Math.round(playerDynamic?.current_hp || 0)} max={playerStats?.max_hp || 100} color="red" icon={<Heart className="w-3 h-3" />} />
                         <StatBar label="MP" current={Math.round(playerDynamic?.current_mp || 0)} max={playerStats?.max_mp || 50} color="blue" icon={<Droplets className="w-3 h-3" />} />
+
+                        {/* Player Effects */}
+                        {playerDynamic?.effects && playerDynamic.effects.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
+                                {playerDynamic.effects.map((effect: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800/80 border border-slate-700 text-xs">
+                                        {effect.type === 'stun' && <span title="Оглушение">💫</span>}
+                                        {effect.type === 'bleed' && <span title="Кровотечение">🩸</span>}
+                                        {effect.type === 'poison' && <span title="Отравление">☠️</span>}
+                                        {effect.type === 'burn' && <span title="Горение">🔥</span>}
+                                        {effect.type === 'empowerment' && <span title="Усиление">💪</span>}
+                                        {effect.type === 'weakness' && <span title="Слабость">📉</span>}
+                                        {effect.type === 'resistance' && <span title="Сопротивление">🛡️</span>}
+                                        <span className="text-slate-300 font-bold">{effect.duration}х</span>
+                                        {effect.value !== undefined && <span className="text-slate-500 font-bold">({effect.value})</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col gap-4">
@@ -191,6 +210,91 @@ const CombatPage: React.FC = () => {
                         >
                             Сбежать
                         </button>
+
+                        {/* Abilities Section */}
+                        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-3xl">
+                            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <Star className="w-3 h-3" /> Способности
+                            </h4>
+                            <div className="grid grid-cols-2 gap-2">
+                                {abilities.filter(a => a.ability_type !== 'passive').map((ability) => {
+                                    const isSelected = selectedAbility?.id === ability.id;
+                                    const canAfford = (playerDynamic?.current_mp ?? 0) >= ability.mp_cost;
+                                    return (
+                                        <button
+                                            key={ability.id}
+                                            disabled={combat.current_turn !== 'player' || turnLoading || !canAfford || combat.status !== 'active'}
+                                            onClick={() => isSelected ? setSelectedAbility(null) : handleUseAbility(ability)}
+                                            className={`p-3 rounded-xl border transition-all text-left relative group ${isSelected
+                                                ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/10'
+                                                : 'bg-slate-800/50 border-slate-700 hover:border-slate-500'
+                                                } disabled:opacity-30`}
+                                            title={ability.description}
+                                        >
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className={`text-[10px] font-bold truncate ${isSelected ? 'text-amber-400' : 'text-slate-200'}`}>
+                                                    {ability.ability_name}
+                                                </span>
+                                                {ability.ability_type === 'attack' ? <Flame className="w-3 h-3 text-red-500" /> : <Shield className="w-3 h-3 text-cyan-500" />}
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-1">
+                                                    <Droplets className="w-2 h-2 text-blue-500" />
+                                                    <span className="text-[10px] text-blue-500 font-bold">{ability.mp_cost}</span>
+                                                </div>
+                                                {ability.duration > 1 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <Timer className="w-2 h-2 text-slate-500" />
+                                                        <span className="text-[10px] text-slate-500 font-bold">{ability.duration}т</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Hover Tooltip - Simplified for now */}
+                                            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 hidden group-hover:block z-50 pointer-events-none">
+                                                {ability.description}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Passive Skills Section */}
+                            {abilities.some(a => a.ability_type === 'passive') && (
+                                <div className="mt-4 pt-4 border-t border-slate-800">
+                                    <h5 className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <Zap className="w-2.5 h-2.5" /> Пассивные усиления
+                                    </h5>
+                                    <div className="flex flex-wrap gap-2">
+                                        {abilities.filter(a => a.ability_type === 'passive').map(ability => (
+                                            <div
+                                                key={ability.id}
+                                                className="px-2 py-1 bg-slate-950 border border-slate-800/50 rounded-lg text-[10px] text-slate-400 flex items-center gap-2 group/pass relative"
+                                                title={ability.description}
+                                            >
+                                                <span className="font-bold">{ability.ability_name}</span>
+                                                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 hidden group-hover/pass:block z-50 pointer-events-none">
+                                                    {ability.description}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedAbility && (
+                                <div className="mt-4 flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 px-3">
+                                    <span className="text-[10px] text-amber-500 font-bold uppercase flex items-center gap-2">
+                                        <Zap className="w-3 h-3 animate-pulse" /> Выберите цель
+                                    </span>
+                                    <button
+                                        onClick={() => setSelectedAbility(null)}
+                                        className="text-[10px] text-slate-500 hover:text-white underline font-bold"
+                                    >
+                                        Отмена
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Battle Stats Display - Player */}
                         <div className="bg-slate-900/40 border border-slate-800 p-3 rounded-2xl space-y-2 text-[10px] font-bold uppercase tracking-tighter">
@@ -261,6 +365,12 @@ const CombatPage: React.FC = () => {
                                     </div>
                                     <div className="text-red-400">+{(playerStats?.hp_regen || 0).toFixed(1)}/ход</div>
                                 </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Droplets className="w-3 h-3" /> Реген MP
+                                    </div>
+                                    <div className="text-blue-400">+{(playerStats?.mp_regen || 0).toFixed(1)}/ход</div>
+                                </div>
                                 {(playerDynamic?.barrier_hp || 0) > 0 && (
                                     <div className="px-2 py-1 bg-purple-900/30 border border-purple-500/30 rounded-lg col-span-2">
                                         <div className="flex items-center gap-1 text-purple-400 mb-1">
@@ -293,91 +403,6 @@ const CombatPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
-
-                    {/* Abilities Section */}
-                    <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-3xl">
-                        <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Star className="w-3 h-3" /> Способности
-                        </h4>
-                        <div className="grid grid-cols-2 gap-2">
-                            {abilities.filter(a => a.ability_type !== 'passive').map((ability) => {
-                                const isSelected = selectedAbility?.id === ability.id;
-                                const canAfford = (playerDynamic?.current_mp ?? 0) >= ability.mp_cost;
-                                return (
-                                    <button
-                                        key={ability.id}
-                                        disabled={combat.current_turn !== 'player' || turnLoading || !canAfford || combat.status !== 'active'}
-                                        onClick={() => isSelected ? setSelectedAbility(null) : handleUseAbility(ability)}
-                                        className={`p-3 rounded-xl border transition-all text-left relative group ${isSelected
-                                            ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/10'
-                                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-500'
-                                            } disabled:opacity-30`}
-                                        title={ability.description}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className={`text-[10px] font-bold truncate ${isSelected ? 'text-amber-400' : 'text-slate-200'}`}>
-                                                {ability.ability_name}
-                                            </span>
-                                            {ability.ability_type === 'attack' ? <Flame className="w-3 h-3 text-red-500" /> : <Shield className="w-3 h-3 text-cyan-500" />}
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-1">
-                                                <Droplets className="w-2 h-2 text-blue-500" />
-                                                <span className="text-[10px] text-blue-500 font-bold">{ability.mp_cost}</span>
-                                            </div>
-                                            {ability.duration > 1 && (
-                                                <div className="flex items-center gap-1">
-                                                    <Timer className="w-2 h-2 text-slate-500" />
-                                                    <span className="text-[10px] text-slate-500 font-bold">{ability.duration}т</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Hover Tooltip - Simplified for now */}
-                                        <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 hidden group-hover:block z-50 pointer-events-none">
-                                            {ability.description}
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Passive Skills Section */}
-                        {abilities.some(a => a.ability_type === 'passive') && (
-                            <div className="mt-4 pt-4 border-t border-slate-800">
-                                <h5 className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                    <Zap className="w-2.5 h-2.5" /> Пассивные усиления
-                                </h5>
-                                <div className="flex flex-wrap gap-2">
-                                    {abilities.filter(a => a.ability_type === 'passive').map(ability => (
-                                        <div
-                                            key={ability.id}
-                                            className="px-2 py-1 bg-slate-950 border border-slate-800/50 rounded-lg text-[10px] text-slate-400 flex items-center gap-2 group/pass relative"
-                                            title={ability.description}
-                                        >
-                                            <span className="font-bold">{ability.ability_name}</span>
-                                            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-slate-300 hidden group-hover/pass:block z-50 pointer-events-none">
-                                                {ability.description}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {selectedAbility && (
-                            <div className="mt-4 flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 px-3">
-                                <span className="text-[10px] text-amber-500 font-bold uppercase flex items-center gap-2">
-                                    <Zap className="w-3 h-3 animate-pulse" /> Выберите цель
-                                </span>
-                                <button
-                                    onClick={() => setSelectedAbility(null)}
-                                    className="text-[10px] text-slate-500 hover:text-white underline font-bold"
-                                >
-                                    Отмена
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </div>
 
                 {/* Enemy Card */}
@@ -397,7 +422,26 @@ const CombatPage: React.FC = () => {
                         </div>
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
                             <StatBar label="HP" current={activeEnemy.current_hp} max={activeEnemy.max_hp || 1} color="red" icon={<Heart className="w-3 h-3" />} />
-                            <div className="h-3 bg-transparent hidden md:block" /> {/* Spacer */}
+
+                            {/* Enemy Effects */}
+                            {activeEnemy.effects && activeEnemy.effects.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800 justify-end md:justify-start">
+                                    {activeEnemy.effects.map((effect: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800/80 border border-slate-700 text-xs flex-row-reverse md:flex-row">
+                                            {effect.type === 'stun' && <span title="Оглушение">💫</span>}
+                                            {effect.type === 'bleed' && <span title="Кровотечение">🩸</span>}
+                                            {effect.type === 'poison' && <span title="Отравление">☠️</span>}
+                                            {effect.type === 'burn' && <span title="Горение">🔥</span>}
+                                            {effect.type === 'empowerment' && <span title="Усиление">💪</span>}
+                                            {effect.type === 'weakness' && <span title="Слабость">📉</span>}
+                                            {effect.type === 'resistance' && <span title="Сопротивление">🛡️</span>}
+                                            <span className="text-slate-300 font-bold">{effect.duration}х</span>
+                                            {effect.value !== undefined && <span className="text-slate-500 font-bold">({effect.value})</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {(!activeEnemy.effects || activeEnemy.effects.length === 0) && <div className="h-3 bg-transparent hidden md:block" />}
                         </div>
 
                         {/* Enemy Stats */}
@@ -455,6 +499,12 @@ const CombatPage: React.FC = () => {
                                         <Heart className="w-3 h-3" /> Реген HP
                                     </div>
                                     <div className="text-red-400">+{((activeEnemy as any).enemy_stats?.hp_regen || 0).toFixed(1)}/ход</div>
+                                </div>
+                                <div className="px-2 py-1 bg-slate-800/50 rounded-lg">
+                                    <div className="flex items-center gap-1 text-slate-500 mb-1">
+                                        <Droplets className="w-3 h-3" /> Реген MP
+                                    </div>
+                                    <div className="text-blue-400">+{((activeEnemy as any).enemy_stats?.mp_regen || 0).toFixed(1)}/ход</div>
                                 </div>
                             </div>
                         </div>

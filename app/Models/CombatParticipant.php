@@ -16,9 +16,18 @@ class CombatParticipant extends Model
         'max_mp',
         'level',
         'position',
+        'effects',
     ];
 
     protected $appends = ['enemy_stats'];
+
+    protected $attributes = [
+        'effects' => '[]',
+    ];
+
+    protected $casts = [
+        'effects' => 'array',
+    ];
 
     public function combat(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {

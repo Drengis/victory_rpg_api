@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore';
 import api from '../api/axios';
 import { Navigate, useNavigate } from 'react-router-dom';
 import StatBar from '../components/StatBar';
-import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft, Star, ScrollText, Trophy } from 'lucide-react';
+import { Heart, Droplets, Shield, Target, Coins, Skull, Package, Search, Loader2, Plus, Sparkles, Store, ArrowRight, ArrowLeft, Star, ScrollText, Trophy, Timer } from 'lucide-react';
 import { formatNumber } from '../lib/utils';
 import { goDeeper, startCombat, changeDepth } from '../api/combatApi';
 
@@ -147,6 +147,18 @@ const DashboardPage: React.FC = () => {
         } finally {
             setSyncing(false);
         }
+    };
+
+    const formatTime = (totalSeconds: number) => {
+        if (totalSeconds <= 0) return "0с";
+
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+
+        if (minutes > 0) {
+            return `${minutes}м ${seconds}с`;
+        }
+        return `${seconds}с`;
     };
 
     return (
@@ -297,20 +309,39 @@ const DashboardPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <StatBar
-                    label="Здоровье"
-                    current={Math.round(dynamic.current_hp)}
-                    max={stats.max_hp}
-                    color="red"
-                    icon={<Heart className="w-3 h-3" />}
-                />
-                <StatBar
-                    label="Мана"
-                    current={Math.round(dynamic.current_mp)}
-                    max={stats.max_mp}
-                    color="blue"
-                    icon={<Droplets className="w-3 h-3" />}
-                />
+                {/* Блок Здоровья */}
+                <div className="flex flex-col gap-1">
+                    <StatBar
+                        label="Здоровье"
+                        current={Math.round(dynamic.current_hp)}
+                        max={stats.max_hp}
+                        color="red"
+                        icon={<Heart className="w-3 h-3" />}
+                    />
+                    {dynamic.current_hp < stats.max_hp && stats.hp_regen > 0 && (
+                        <div className="text-[10px] text-slate-500 font-medium text-right flex items-center justify-end gap-1">
+                            <Timer className="w-2.5 h-2.5 text-slate-400" />
+                            До полного: {formatTime(Math.ceil((stats.max_hp - dynamic.current_hp) / (stats.hp_regen / 60)))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Блок Маны */}
+                <div className="flex flex-col gap-1">
+                    <StatBar
+                        label="Мана"
+                        current={Math.round(dynamic.current_mp)}
+                        max={stats.max_mp}
+                        color="blue"
+                        icon={<Droplets className="w-3 h-3" />}
+                    />
+                    {dynamic.current_mp < stats.max_mp && stats.mp_regen > 0 && (
+                        <div className="text-[10px] text-slate-500 font-medium text-right flex items-center justify-end gap-1">
+                            <Timer className="w-2.5 h-2.5 text-slate-400" />
+                            До полного: {formatTime(Math.ceil((stats.max_mp - dynamic.current_mp) / (stats.mp_regen / 60)))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

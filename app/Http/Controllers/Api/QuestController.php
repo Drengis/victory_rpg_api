@@ -48,8 +48,9 @@ class QuestController extends BaseController
             return $this->errorResponse('Это не ваш персонаж', 403);
         }
 
-        // Синхронизируем золото перед показом (в QuestService есть gold_check)
+        // Синхронизируем прогресс перед показом
         $this->service->updateProgress($character, 'gold_check', 0);
+        $this->service->updateProgress($character, 'loot_check', 0);
         
         $quests = $this->service->getQuestsForCharacter($character);
 

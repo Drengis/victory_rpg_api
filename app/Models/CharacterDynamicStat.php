@@ -20,6 +20,11 @@ class CharacterDynamicStat extends Model
         'barrier_hp',
         'last_combat_log',
         'enemies_defeated_at_depth',
+        'effects',
+    ];
+
+    protected $attributes = [
+        'effects' => '[]',
     ];
 
     protected $casts = [
@@ -27,6 +32,7 @@ class CharacterDynamicStat extends Model
         'last_regen_at' => 'datetime',
         'temp_armor_duration' => 'integer',
         'temp_evasion_duration' => 'integer',
+        'effects' => 'array',
     ];
 
     public function character(): BelongsTo
