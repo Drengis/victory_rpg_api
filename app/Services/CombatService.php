@@ -641,6 +641,7 @@ class CombatService
                 $combat->experience_reward += $rewards['experience'];
                 $combat->save();
                 $logs[] = "☠️ {$enemy->name} погиб от эффектов!";
+                $this->finishCombat($combat, 'won');
             }
         }
 
